@@ -1,76 +1,84 @@
-import { SpotifyTrack } from '@/types/spotify';
+import type { SpotifyTrack } from '@/types/spotify';
 
-const BASE_URL = 'https://api.spotify.com/v1';
+class SpotifyAPI {
+  private baseUrl = 'https://api.spotify.com/v1';
 
-export class SpotifyError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-    this.name = 'SpotifyError';
-  }
-}
-
-async function handleResponse(response: Response) {
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new SpotifyError(response.status, errorText);
-  }
-  return response;
-}
-
-export const spotifyApi = {
-  async getCurrentPlayback(accessToken: string) {
-    const response = await fetch(`${BASE_URL}/me/player`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+  private async fetchWithToken(endpoint: string, accessToken: string, options: RequestInit = {}) {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
     });
 
-    if (response.status === 204) {
-      return null;
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: { message: 'An unknown error occurred' } }));
+      throw new Error(error.error?.message || 'Failed to fetch from Spotify API');
     }
 
-    const data = await handleResponse(response).then(r => r.json());
-    // Return the currently playing track if it exists
-    return data?.item || null;
-  },
+    return response.json();
+  }
 
-  async getQueue(accessToken: string) {
-    const response = await fetch(`${BASE_URL}/me/player/queue`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+  async getCurrentPlayback(accessToken: string): Promise<SpotifyTrack | null> {
+    try {
+      const data = await this.fetchWithToken('/me/player', accessToken);
+      return data?.item || null;
+    } catch (error) {
+      console.error('Error getting current playback:', error);
+      throw error;
+    }
+  }
 
-    const data = await handleResponse(response).then(r => r.json());
-    return data.queue as SpotifyTrack[];
-  },
+  async getQueue(accessToken: string): Promise<SpotifyTrack[]> {
+    try {
+      const data = await this.fetchWithToken('/me/player/queue', accessToken);
+      return data?.queue || [];
+    } catch (error) {
+      console.error('Error getting queue:', error);
+      throw error;
+    }
+  }
 
-  async searchTracks(accessToken: string, query: string) {
-    const response = await fetch(
-      `${BASE_URL}/search?q=${encodeURIComponent(query)}&type=track&limit=20&market=from_token`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+  async searchTracks(accessToken: string, query: string): Promise<SpotifyTrack[]> {
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        type: 'track',
+        limit: '10'
+      });
+      
+      const data = await this.fetchWithToken(`/search?${params}`, accessToken);
+      return data.tracks.items;
+    } catch (error) {
+      console.error('Error searching tracks:', error);
+      throw error;
+    }
+  }
 
-    const data = await handleResponse(response).then(r => r.json());
-    return data.tracks.items as SpotifyTrack[];
-  },
+  async addToQueue(accessToken: string, uri: string): Promise<void> {
+    try {
+      await this.fetchWithToken('/me/player/queue', accessToken, {
+        method: 'POST',
+        body: JSON.stringify({ uri }),
+      });
+    } catch (error) {
+      console.error('Error adding to queue:', error);
+      throw error;
+    }
+  }
 
-  async addToQueue(accessToken: string, trackUri: string) {
-    const response = await fetch(`${BASE_URL}/me/player/queue?uri=${trackUri}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+  async skipTrack(accessToken: string): Promise<void> {
+    try {
+      await this.fetchWithToken('/me/player/next', accessToken, {
+        method: 'POST'
+      });
+    } catch (error) {
+      console.error('Error skipping track:', error);
+      throw error;
+    }
+  }
+}
 
-    await handleResponse(response);
-  },
-
-  async skipTrack(accessToken: string) {
-    const response = await fetch(`${BASE_URL}/me/player/next`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    await handleResponse(response);
-  },
-}; 
+export const spotifyApi = new SpotifyAPI(); 

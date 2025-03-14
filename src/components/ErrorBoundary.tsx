@@ -2,21 +2,24 @@ import { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
-  fallback?: ReactNode;
 }
 
 interface State {
   hasError: boolean;
-  error?: Error;
+  error: Error | null;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
-    hasError: false
+    hasError: false,
+    error: null,
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return {
+      hasError: true,
+      error,
+    };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -25,21 +28,18 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
-      return this.props.fallback || (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-[#121212] text-white p-4">
-          <h2 className="text-2xl font-bold mb-4">Something went wrong</h2>
-          <p className="text-gray-400 mb-4">Please try refreshing the page</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-[#1DB954] hover:bg-[#1ed760] text-black px-6 py-2 rounded-full"
-          >
-            Refresh Page
-          </button>
-          {this.state.error && (
-            <pre className="mt-4 p-4 bg-[#282828] rounded overflow-auto max-w-full">
-              {this.state.error.toString()}
-            </pre>
-          )}
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#121212] p-4">
+          <div className="bg-[#282828] p-6 rounded-lg max-w-lg w-full text-center">
+            <h2 className="text-2xl font-bold text-white mb-4">Something went wrong</h2>
+            <p className="text-gray-400 mb-6">{this.state.error?.message}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-[#1DB954] text-black px-6 py-2 rounded-full font-semibold hover:bg-[#1ed760] transition-colors duration-200"
+            >
+              Reload page
+            </button>
+          </div>
         </div>
       );
     }

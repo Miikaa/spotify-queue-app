@@ -1,65 +1,81 @@
 # Spotify Queue Manager
 
-A web application that allows you to manage your Spotify queue with ease. Built with Next.js and Spotify Web API.
+A modern web application built with Next.js that allows you to manage your Spotify queue with ease. Search for tracks, add them to your queue, and control playback all from one place.
 
 ## Features
 
-- View currently playing track
-- View and manage queue
-- Search and add tracks to queue
-- Real-time queue updates
-- Responsive design
+- 🎵 View your current Spotify queue
+- 🔍 Search for tracks
+- ➕ Add tracks to queue
+- ⏭️ Skip to next track
+- 🔄 Real-time queue updates
+- 🎨 Modern and responsive UI
+- 🔒 Secure authentication with Spotify
 
-## Getting Started
+## Prerequisites
 
-### Prerequisites
-
-- Node.js 18.0 or later
+- Node.js 18.x or later
 - A Spotify account
-- Spotify Developer credentials
+- A Spotify Developer account with a registered application
 
-### Setup
+## Setup
 
 1. Clone the repository:
-```bash
-git clone <your-repo-url>
-cd spotify-queue-app
-```
+   ```bash
+   git clone <repository-url>
+   cd spotify-queue-app
+   ```
 
 2. Install dependencies:
-```bash
-npm install
-```
+   ```bash
+   npm install
+   ```
 
-3. Create a `.env.local` file in the root directory with your Spotify credentials:
-```
-SPOTIFY_CLIENT_ID=your_client_id
-SPOTIFY_CLIENT_SECRET=your_client_secret
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your_nextauth_secret
-```
+3. Create a `.env.local` file in the root directory with the following variables:
+   ```
+   SPOTIFY_CLIENT_ID=your_spotify_client_id
+   SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+   NEXTAUTH_SECRET=your_nextauth_secret
+   NEXTAUTH_URL=http://localhost:3000
+   ```
 
-4. Start the development server:
-```bash
-npm run dev
-```
+   To get your Spotify credentials:
+   1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+   2. Create a new application
+   3. Add `http://localhost:3000/api/auth/callback/spotify` to the Redirect URIs
+   4. Copy the Client ID and Client Secret to your `.env.local` file
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
 
-## Tech Stack
+5. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+## Usage
+
+1. Click "Login with Spotify" to authenticate
+2. Make sure you have an active Spotify playback session (playing music on any device)
+3. Use the search tab to find tracks
+4. Click "Add to Queue" to add tracks to your queue
+5. Use the queue tab to view your current queue
+6. Click "Skip" to skip to the next track
+
+## Technologies Used
 
 - [Next.js](https://nextjs.org/)
+- [TypeScript](https://www.typescriptlang.org/)
 - [NextAuth.js](https://next-auth.js.org/)
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Spotify Web API](https://developer.spotify.com/documentation/web-api/)
 
-## Technologies Used
+## Contributing
 
-- Next.js 14
-- TypeScript
-- Tailwind CSS
-- NextAuth.js
-- Spotify Web API
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Learn More
 

@@ -54,7 +54,10 @@ export default function Home() {
 
   const debouncedSearch = useCallback(
     debounce(async (query: string, token: string) => {
-      if (!query.trim()) return;
+      if (!query.trim()) {
+        setSearchResults([]);
+        return;
+      }
 
       try {
         setIsLoading(true);
@@ -79,6 +82,7 @@ export default function Home() {
     }
 
     if (!searchQuery.trim()) {
+      setSearchResults([]);
       addNotification('Please enter a search query', 'info');
       return;
     }
@@ -231,14 +235,34 @@ export default function Home() {
           {activeTab === 'search' && (
             <div className="mb-8">
               <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  placeholder="Search for tracks..."
-                  className="flex-1 bg-[#282828] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1DB954]"
-                />
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    placeholder="Search for tracks..."
+                    className="w-full bg-[#282828] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1DB954] pr-10"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery('');
+                        setSearchResults([]);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white focus:outline-none"
+                      aria-label="Clear search"
+                    >
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path
+                          fillRule="evenodd"
+                          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={handleSearch}
                   className="bg-[#1DB954] text-black px-6 py-2 rounded-lg font-semibold hover:bg-[#1ed760] transition-colors duration-200"

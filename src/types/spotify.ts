@@ -1,16 +1,20 @@
 export interface SpotifyArtist {
+  id: string;
   name: string;
+  uri: string;
 }
 
 export interface SpotifyImage {
   url: string;
-  width: number;
   height: number;
+  width: number;
 }
 
 export interface SpotifyAlbum {
+  id: string;
   name: string;
   images: SpotifyImage[];
+  uri: string;
 }
 
 export interface SpotifyTrack {
@@ -24,6 +28,9 @@ export interface SpotifyTrack {
 export interface SpotifySearchResponse {
   tracks: {
     items: SpotifyTrack[];
+    total: number;
+    limit: number;
+    offset: number;
   };
 }
 
