@@ -19,17 +19,15 @@ export interface SpotifyAlbum {
   images: SpotifyImage[];
 }
 
-export type SpotifyTrack = Track;
-
 export interface PlaybackState {
-  track: SpotifyTrack;
+  track: Track;
   progress_ms: number;
   is_playing: boolean;
 }
 
 export interface SpotifySearchResponse {
   tracks: {
-    items: SpotifyTrack[];
+    items: Track[];
     total: number;
     limit: number;
     offset: number;

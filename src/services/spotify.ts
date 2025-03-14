@@ -1,5 +1,5 @@
 import { SpotifyApi, Track } from '@spotify/web-api-ts-sdk';
-import type { SpotifyTrack, PlaybackState } from '@/types/spotify';
+import type { PlaybackState } from '@/types/spotify';
 
 class SpotifyAPI {
   private api: SpotifyApi | null = null;
@@ -38,7 +38,7 @@ class SpotifyAPI {
     }
   }
 
-  async getQueue(accessToken: string): Promise<SpotifyTrack[]> {
+  async getQueue(accessToken: string): Promise<Track[]> {
     try {
       // First get the current context to check if we're in a playlist/album
       const api = this.getApi(accessToken);
@@ -76,7 +76,7 @@ class SpotifyAPI {
     }
   }
 
-  async searchTracks(accessToken: string, query: string): Promise<SpotifyTrack[]> {
+  async searchTracks(accessToken: string, query: string): Promise<Track[]> {
     try {
       const api = this.getApi(accessToken);
       const results = await api.search(query, ['track']);

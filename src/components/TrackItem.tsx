@@ -1,8 +1,8 @@
+import { Track } from '@spotify/web-api-ts-sdk';
 import Image from 'next/image';
-import type { SpotifyTrack } from '@/types/spotify';
 
 interface TrackItemProps {
-  track: SpotifyTrack;
+  track: Track;
   onAddToQueue?: (uri: string) => Promise<void>;
   showAddButton?: boolean;
 }
