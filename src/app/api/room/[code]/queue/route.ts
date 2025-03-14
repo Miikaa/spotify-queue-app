@@ -26,37 +26,33 @@ export async function GET(
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
 
-    // Get host's session to access their queue
-    const session = await getServerSession(authOptions);
-    const user = session?.user;
+    // Create Spotify API client with host's tokens
+    const accessToken: AccessToken = {
+      access_token: room.hostAccessToken,
+      token_type: "Bearer",
+      expires_in: 3600,
+      refresh_token: room.hostRefreshToken
+    };
 
-    // Check if the requester is the host and has valid credentials
-    if (user && user.id === room.hostId && user.accessToken && user.refreshToken) {
-      // If requester is host, get queue from Spotify
-      const spotifyApi = getSpotifyApi(user.accessToken, user.refreshToken);
-      const playbackState = await spotifyApi.player.getPlaybackState();
-      const currentTrack = playbackState?.item;
-      
-      // Get the next few tracks from our database as Spotify doesn't provide queue info
-      const upcomingTracks = await prisma.queue.findMany({
-        where: {
-          roomId: room.id,
-          played: false,
-        },
-        orderBy: {
-          addedAt: 'asc',
-        },
-        take: 10,
-      });
+    const spotify = SpotifyApi.withAccessToken(
+      process.env.SPOTIFY_CLIENT_ID!,
+      accessToken
+    );
 
-      return NextResponse.json({
-        currentTrack,
-        queue: upcomingTracks,
-      });
+    // Get queue from Spotify
+    const queueResponse = await fetch('https://api.spotify.com/v1/me/player/queue', {
+      headers: {
+        'Authorization': `Bearer ${room.hostAccessToken}`,
+      },
+    });
+
+    let queue = [];
+    if (queueResponse.ok) {
+      const queueData = await queueResponse.json();
+      queue = queueData.queue || [];
     }
 
-    // For guests, return the queue from our database
-    return NextResponse.json({ queue: room.queue });
+    return NextResponse.json({ queue });
   } catch (error) {
     console.error('Error fetching queue:', error);
     return NextResponse.json(
@@ -73,8 +69,9 @@ export async function POST(
 ) {
   try {
     const { code } = params;
+    const { trackUri } = await request.json();
 
-    // Find the room first
+    // Find the room
     const room = await prisma.room.findUnique({
       where: { code, active: true },
     });
@@ -83,33 +80,36 @@ export async function POST(
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
 
-    const hostInfo = await getHostInfo(code);
+    // Create Spotify API client with host's tokens
+    const accessToken: AccessToken = {
+      access_token: room.hostAccessToken,
+      token_type: "Bearer",
+      expires_in: 3600,
+      refresh_token: room.hostRefreshToken
+    };
 
-    if (!hostInfo) {
-      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
-    }
+    const spotify = SpotifyApi.withAccessToken(
+      process.env.SPOTIFY_CLIENT_ID!,
+      accessToken
+    );
 
-    const { trackUri, trackName } = await request.json();
-
-    if (!trackUri || !trackName) {
-      return NextResponse.json(
-        { error: 'Missing track information' },
-        { status: 400 }
-      );
-    }
-
-    const spotifyApi = getSpotifyApi(hostInfo.accessToken, hostInfo.refreshToken);
-    await spotifyApi.player.addItemToPlaybackQueue(trackUri);
-
-    // Add track to our database queue
-    await prisma.queue.create({
-      data: {
-        roomId: room.id,
-        trackUri,
-        trackName,
-        addedBy: 'guest',
+    // Add track to queue using host's tokens
+    const response = await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${trackUri}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${room.hostAccessToken}`,
       },
     });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return NextResponse.json(
+          { error: 'No active device found. The host needs to have Spotify open and playing.' },
+          { status: 404 }
+        );
+      }
+      throw new Error('Failed to add track to queue');
+    }
 
     return NextResponse.json({ message: 'Track added to queue' });
   } catch (error) {

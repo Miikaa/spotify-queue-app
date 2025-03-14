@@ -13,26 +13,48 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
 model User {
   id            String   @id
   name          String
   email         String?
   image         String?
+  accounts      Account[]
   hostedRooms   Room[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
 
 model Room {
-  id             String          @id @default(cuid())
-  code           String          @unique // 6-digit room code
-  hostId         String          // Spotify user ID of the host
-  host           User            @relation(fields: [hostId], references: [id])
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  active         Boolean         @default(true)
-  queue          Queue[]
-  connectedUsers ConnectedUser[]
+  id              String          @id @default(cuid())
+  code            String          @unique // 6-digit room code
+  hostId          String          // Spotify user ID of the host
+  host            User            @relation(fields: [hostId], references: [id])
+  hostAccessToken String          // Host's Spotify access token
+  hostRefreshToken String         // Host's Spotify refresh token
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  active          Boolean         @default(true)
+  queue           Queue[]
+  connectedUsers  ConnectedUser[]
 }
 
 model Queue {

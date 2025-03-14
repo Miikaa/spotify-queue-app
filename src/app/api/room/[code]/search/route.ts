@@ -36,7 +36,7 @@ export async function GET(
     const user = session?.user;
 
     // If we have host credentials, use them
-    if (user?.id === room.hostId && user.accessToken && user.refreshToken) {
+    if (user && user.id === room.hostId && user.accessToken && user.refreshToken) {
       const accessToken: AccessToken = {
         access_token: user.accessToken,
         token_type: "Bearer",
@@ -48,7 +48,9 @@ export async function GET(
         accessToken
       );
       const results = await spotifyApi.search(query, ['track']);
-      return NextResponse.json(results);
+      return NextResponse.json({
+        tracks: results.tracks.items
+      });
     }
 
     // If no host credentials, use client credentials flow
@@ -57,7 +59,9 @@ export async function GET(
       process.env.SPOTIFY_CLIENT_SECRET!
     );
     const results = await clientApi.search(query, ['track']);
-    return NextResponse.json(results);
+    return NextResponse.json({
+      tracks: results.tracks.items
+    });
   } catch (error) {
     console.error('Error searching tracks:', error);
     return NextResponse.json(

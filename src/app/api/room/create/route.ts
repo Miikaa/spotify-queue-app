@@ -17,21 +17,6 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get the user's Spotify tokens from the session
-    const spotifyAccount = await prisma.account.findFirst({
-      where: {
-        userId: session.user.id,
-        provider: 'spotify',
-      },
-    });
-
-    if (!spotifyAccount?.access_token || !spotifyAccount?.refresh_token) {
-      return NextResponse.json(
-        { error: 'Spotify account not connected' },
-        { status: 400 }
-      );
-    }
-
     // Create or update user
     const user = await prisma.user.upsert({
       where: { id: session.user.id },
@@ -63,13 +48,13 @@ export async function POST() {
       }
     }
 
-    // Create new room with Spotify tokens
+    // Create new room with Spotify tokens from session
     const room = await prisma.room.create({
       data: {
         code: roomCode,
         hostId: user.id,
-        hostAccessToken: spotifyAccount.access_token,
-        hostRefreshToken: spotifyAccount.refresh_token,
+        hostAccessToken: session.user.accessToken!,
+        hostRefreshToken: session.user.refreshToken!,
         active: true,
       },
       include: {

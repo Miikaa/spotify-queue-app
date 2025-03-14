@@ -193,28 +193,29 @@ export async function GET(
       return NextResponse.json(response);
     }
 
-    const playbackState = await playbackResponse.json();
+    const playbackData = await playbackResponse.json();
 
-    // Get queue from our database
-    const queueItems = await prisma.queue.findMany({
-      where: {
-        roomId: room.id,
-        played: false,
+    // Get queue information
+    const queueResponse = await fetch('https://api.spotify.com/v1/me/player/queue', {
+      headers: {
+        'Authorization': `Bearer ${room.hostAccessToken}`,
       },
-      orderBy: {
-        addedAt: 'asc',
-      },
-      take: 10,
     });
 
-    const response: PlaybackResponse = {
-      currentTrack: playbackState.item,
-      queue: queueItems,
-      progress_ms: playbackState.progress_ms,
-      is_playing: playbackState.is_playing,
-      status: 'ok',
-    };
+    let queue = [];
+    if (queueResponse.ok) {
+      const queueData = await queueResponse.json();
+      queue = queueData.queue || [];
+    }
 
+    const response: PlaybackResponse = {
+      currentTrack: playbackData.item,
+      queue,
+      progress_ms: playbackData.progress_ms,
+      is_playing: playbackData.is_playing,
+      status: 'ok',
+      message: '',
+    };
     return NextResponse.json(response);
   } catch (error) {
     console.error('Error fetching playback state:', error);

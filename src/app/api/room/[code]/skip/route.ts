@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getHostInfo } from '@/lib/roomManager';
-import { getSpotifyApi } from '@/lib/spotify';
+import { PrismaClient } from '@prisma/client';
+import { SpotifyApi, AccessToken } from '@spotify/web-api-ts-sdk';
+
+const prisma = new PrismaClient();
 
 export async function POST(
   request: Request,
@@ -8,14 +10,31 @@ export async function POST(
 ) {
   try {
     const { code } = params;
-    const hostInfo = await getHostInfo(code);
 
-    if (!hostInfo) {
+    // Find the room and check if it's active
+    const room = await prisma.room.findUnique({
+      where: { code, active: true },
+    });
+
+    if (!room) {
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
 
-    const spotifyApi = getSpotifyApi(hostInfo.accessToken, hostInfo.refreshToken);
-    await spotifyApi.player.skipToNext();
+    // Create Spotify API client with host's tokens
+    const accessToken: AccessToken = {
+      access_token: room.hostAccessToken,
+      token_type: "Bearer",
+      expires_in: 3600,
+      refresh_token: room.hostRefreshToken
+    };
+
+    const spotify = SpotifyApi.withAccessToken(
+      process.env.SPOTIFY_CLIENT_ID!,
+      accessToken
+    );
+
+    // Skip to next track
+    await spotify.player.skipToNext('');
 
     return NextResponse.json({ message: 'Track skipped' });
   } catch (error) {

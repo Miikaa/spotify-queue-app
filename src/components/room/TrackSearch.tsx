@@ -42,7 +42,7 @@ export default function TrackSearch({ roomCode }: TrackSearchProps) {
         throw new Error(data.error || 'Failed to search tracks');
       }
 
-      setSearchResults(data.tracks);
+      setSearchResults(data.tracks || []);
     } catch (err) {
       console.error('Error searching tracks:', err);
       setError('Failed to search tracks');

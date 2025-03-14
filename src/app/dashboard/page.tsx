@@ -258,24 +258,34 @@ export default function Dashboard() {
   // Effect for search
   useEffect(() => {
     const searchTracks = async () => {
-      if (!session?.user?.accessToken || !searchQuery.trim()) {
+      if (!searchQuery.trim()) {
         setSearchResults([]);
         return;
       }
       
       try {
-        const response = await fetch(
-          `https://api.spotify.com/v1/search?q=${encodeURIComponent(searchQuery)}&type=track&limit=10`,
-          {
-            headers: {
-              Authorization: `Bearer ${session.user.accessToken}`,
-            },
-          }
-        );
+        let response;
+        if (guestRoomCode) {
+          // Guest search through our API
+          response = await fetch(`/api/room/${guestRoomCode}/search?q=${encodeURIComponent(searchQuery)}`);
+        } else if (session?.user?.accessToken) {
+          // Host search directly through Spotify
+          response = await fetch(
+            `https://api.spotify.com/v1/search?q=${encodeURIComponent(searchQuery)}&type=track&limit=10`,
+            {
+              headers: {
+                Authorization: `Bearer ${session.user.accessToken}`,
+              },
+            }
+          );
+        } else {
+          return;
+        }
         
         if (response.ok) {
           const data = await response.json();
-          setSearchResults(data.tracks.items);
+          // Handle both response formats (guest API and Spotify API)
+          setSearchResults(data.tracks?.items || data.tracks || []);
         }
       } catch (error) {
         console.error('Error searching tracks:', error);
@@ -287,7 +297,7 @@ export default function Dashboard() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, session]);
+  }, [searchQuery, session, guestRoomCode]);
 
   // Toast style constants
   const successToastStyle = {
@@ -422,14 +432,15 @@ export default function Dashboard() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ trackUri, trackName }),
+          body: JSON.stringify({ trackUri }),
         });
         
         if (response.ok) {
           toast.success(`Added "${trackName}" to queue`, successToastStyle);
           // Queue will be updated in the next polling cycle
         } else {
-          throw new Error('Failed to add to queue');
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to add to queue');
         }
       } else {
         // Host adding to queue
@@ -449,7 +460,7 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error adding to queue:', error);
-      toast.error('Failed to add song to queue', errorToastStyle);
+      toast.error(error instanceof Error ? error.message : 'Failed to add song to queue', errorToastStyle);
     } finally {
       setAddToQueueLoading(null);
     }
@@ -468,9 +479,17 @@ export default function Dashboard() {
         });
         
         if (response.ok) {
-          toast.success('Skip requested', successToastStyle);
+          toast.success('Track skipped', successToastStyle);
+          // Wait a bit for Spotify to update
+          setTimeout(async () => {
+            await fetchCurrentTrack();
+            await fetchQueue();
+            setIsSkipLoading(false);
+          }, 500);
+          return;
         } else {
-          throw new Error('Failed to request skip');
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to skip track');
         }
       } else {
         // Host skipping
@@ -495,7 +514,7 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error skipping track:', error);
-      toast.error('Failed to skip track', errorToastStyle);
+      toast.error(error instanceof Error ? error.message : 'Failed to skip track', errorToastStyle);
     }
     setIsSkipLoading(false);
   };
@@ -663,7 +682,14 @@ export default function Dashboard() {
         });
 
         if (!response.ok) {
-          console.error('Failed to sync tokens');
+          const data = await response.json();
+          if (response.status === 404) {
+            // Room not found or user is not host - clear roomId
+            setRoomId(null);
+            localStorage.removeItem('roomId');
+          } else {
+            console.error('Failed to sync tokens:', data.error);
+          }
         }
       } catch (error) {
         console.error('Error syncing tokens:', error);
