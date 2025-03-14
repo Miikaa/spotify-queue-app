@@ -4,10 +4,10 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import { useState, useEffect, useCallback } from "react";
 import Image from 'next/image';
 import { spotifyApi } from '@/services/spotify';
-import type { SpotifyTrack, SpotifySearchResponse } from '@/types/spotify';
+import type { SpotifyTrack } from '@/types/spotify';
 import { useNotification } from '@/hooks/useNotification';
 import { NotificationContainer } from '@/components/Notification';
-import { Loading, LoadingOverlay } from '@/components/Loading';
+import { LoadingOverlay } from '@/components/Loading';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import debounce from 'lodash.debounce';
 
