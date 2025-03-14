@@ -1,4 +1,5 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
+import * as Sentry from '@sentry/nextjs';
 
 interface Props {
   children: ReactNode;
@@ -7,31 +8,43 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  eventId: string | null;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null,
+    eventId: null,
   };
 
   public static getDerivedStateFromError(error: Error): State {
     return {
       hasError: true,
       error,
+      eventId: null,
     };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error:', error, errorInfo);
-    
-    // Here you could send the error to your error reporting service
-    // Example: Sentry.captureException(error);
+    Sentry.withScope((scope) => {
+      scope.setExtras({
+        componentStack: errorInfo.componentStack,
+      });
+      const eventId = Sentry.captureException(error);
+      this.setState({ eventId });
+    });
   }
 
   private handleReload = () => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false, error: null, eventId: null });
     window.location.reload();
+  };
+
+  private handleReport = () => {
+    if (this.state.eventId) {
+      Sentry.showReportDialog({ eventId: this.state.eventId });
+    }
   };
 
   public render() {
@@ -56,6 +69,14 @@ export class ErrorBoundary extends Component<Props, State> {
               >
                 Go to home page
               </button>
+              {this.state.eventId && (
+                <button
+                  onClick={this.handleReport}
+                  className="bg-[#282828] text-white px-6 py-2 rounded-full font-semibold hover:bg-[#3E3E3E] transition-colors duration-200 w-full border border-white/10"
+                >
+                  Report feedback
+                </button>
+              )}
             </div>
           </div>
         </div>

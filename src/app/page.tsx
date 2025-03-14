@@ -10,6 +10,7 @@ import { NotificationContainer } from '@/components/Notification';
 import { LoadingOverlay } from '@/components/Loading';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import debounce from 'lodash.debounce';
+import { SentryTest } from '@/components/SentryTest';
 
 type Tab = 'queue' | 'search';
 
@@ -131,6 +132,24 @@ export default function Home() {
       addNotification('Skipped to next track', 'success');
     } catch (error) {
       console.error('Error skipping track:', error);
+      if (error instanceof Error) {
+        addNotification(error.message, 'error');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClearQueue = async () => {
+    if (!session?.accessToken) return;
+
+    try {
+      setIsLoading(true);
+      await spotifyApi.clearQueue(session.accessToken);
+      await fetchQueue();
+      addNotification('Queue cleared successfully', 'success');
+    } catch (error) {
+      console.error('Error clearing queue:', error);
       if (error instanceof Error) {
         addNotification(error.message, 'error');
       }
@@ -323,7 +342,17 @@ export default function Home() {
           {activeTab === 'queue' && (
             <div className="space-y-4">
               <div className="bg-[#282828] p-4 rounded-lg">
-                <h2 className="text-lg font-semibold text-white mb-4">Queue</h2>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold text-white">Queue</h2>
+                  {queue.length > 0 && (
+                    <button
+                      onClick={handleClearQueue}
+                      className="bg-red-600 text-white px-4 py-2 rounded-full font-semibold hover:bg-red-700 transition-colors duration-200 text-sm"
+                    >
+                      Clear Queue
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-2">
                   {queue.length === 0 ? (
                     <p className="text-gray-400">No tracks in queue</p>
@@ -353,6 +382,9 @@ export default function Home() {
               </div>
             </div>
           )}
+        </div>
+        <div className="fixed bottom-4 right-4">
+          <SentryTest />
         </div>
       </div>
     </ErrorBoundary>

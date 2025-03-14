@@ -9,13 +9,18 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@sentry/cli": "^2.42.3",
+    "@sentry/nextjs": "^9.5.0",
+    "@spotify/web-api-ts-sdk": "^1.2.0",
     "@types/lodash.debounce": "^4.0.9",
+    "formidable": "^3.5.2",
     "lodash.debounce": "^4.0.8",
     "next": "15.2.2",
     "next-auth": "^4.24.11",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "spotify-web-api-node": "^5.0.2"
+    "spotify-web-api-node": "^5.0.2",
+    "superagent": "^10.2.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
