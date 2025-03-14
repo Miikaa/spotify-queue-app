@@ -42,13 +42,13 @@ export const authOptions: NextAuthOptions = {
   },
   debug: process.env.NODE_ENV === 'development',
   callbacks: {
-    async jwt({ token, account }) {
+    async jwt({ token, account, user }) {
       // Add refresh tracking to the token
       if (!token.refreshCount) token.refreshCount = 0;
       if (!token.refreshErrorCount) token.refreshErrorCount = 0;
 
       if (account && account.access_token) {
-        // Initial sign in
+        // Initial sign in - include user profile data
         return {
           ...token,
           accessToken: account.access_token,
@@ -56,6 +56,9 @@ export const authOptions: NextAuthOptions = {
           accessTokenExpires: account.expires_at,
           refreshCount: 0,
           refreshErrorCount: 0,
+          name: user?.name,
+          email: user?.email,
+          picture: user?.image,
         };
       }
 
@@ -120,10 +123,9 @@ export const authOptions: NextAuthOptions = {
         refreshCount: token.refreshCount,
         refreshErrorCount: token.refreshErrorCount,
         user: {
-          ...session.user,
-          name: token.name ?? null,
-          email: token.email ?? null,
-          image: token.picture ?? null,
+          name: token.name,
+          email: token.email,
+          image: token.picture,
         },
       };
     }
