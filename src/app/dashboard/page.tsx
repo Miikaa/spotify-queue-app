@@ -648,6 +648,31 @@ export default function Dashboard() {
     };
   }, [guestRoomCode, hostInfo]);
 
+  // Effect for session changes
+  useEffect(() => {
+    const syncTokens = async () => {
+      if (!session?.user?.accessToken || !roomId) return;
+
+      try {
+        // Update room with latest tokens
+        const response = await fetch(`/api/room/${roomId}/sync-tokens`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          console.error('Failed to sync tokens');
+        }
+      } catch (error) {
+        console.error('Error syncing tokens:', error);
+      }
+    };
+
+    syncTokens();
+  }, [session?.user?.accessToken, roomId]);
+
   return (
     <div className="min-h-screen bg-[#121212] text-white">
       <Toaster
