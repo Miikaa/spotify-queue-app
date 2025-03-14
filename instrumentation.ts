@@ -1,5 +1,7 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
+
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { default: Sentry } = await import('@sentry/nextjs');
@@ -17,4 +19,7 @@ export async function register() {
       tracesSampleRate: 1.0,
     });
   }
-} 
+}
+
+// Export Sentry's captureRequestError function directly
+export const onRequestError = Sentry.captureRequestError; 

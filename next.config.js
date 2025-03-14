@@ -22,9 +22,8 @@ const nextConfig = {
       }
     ],
   },
-  // Instrumentation is no longer experimental in Next.js 15
-  instrumentation: {
-    enabled: true
+  experimental: {
+    instrumentationHook: true
   }
 }
 
