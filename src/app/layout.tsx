@@ -4,6 +4,8 @@ import "./globals.css";
 import { getServerSession } from "next-auth";
 import SessionProvider from "@/components/SessionProvider";
 import { authOptions } from "./api/auth/[...nextauth]/options";
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,9 +24,11 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <SessionProvider session={session}>
-          {children}
-        </SessionProvider>
+        <QueryClientProvider client={queryClient}>
+          <SessionProvider session={session}>
+            {children}
+          </SessionProvider>
+        </QueryClientProvider>
       </body>
     </html>
   );

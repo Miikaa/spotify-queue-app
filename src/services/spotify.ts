@@ -84,11 +84,25 @@ class SpotifyAPI {
 
   async skipTrack(accessToken: string): Promise<void> {
     try {
+      // First get the active device
       const api = this.getApi(accessToken);
       const state = await api.player.getPlaybackState();
-      if (state?.device?.id) {
-        await api.player.skipToNext(state.device.id);
+      
+      if (!state?.device?.id) {
+        throw new Error('No active Spotify device found');
       }
+
+      const response = await fetch(`https://api.spotify.com/v1/me/player/next?device_id=${state.device.id}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to skip track');
+      }
+      // 204 No Content response is expected and OK
     } catch (error) {
       console.error('Error skipping track:', error);
       throw error;
@@ -104,17 +118,10 @@ class SpotifyAPI {
         return;
       }
 
-      const api = this.getApi(accessToken);
-      const state = await api.player.getPlaybackState();
-      
-      // If no active device, can't clear queue
-      if (!state?.device?.id) {
-        throw new Error('No active Spotify device found');
-      }
-      
+      // Skip each track in the queue
       for (let i = 0; i < queue.length; i++) {
         try {
-          await api.player.skipToNext(state.device.id);
+          await this.skipTrack(accessToken);
           // Add a small delay to prevent rate limiting
           await new Promise(resolve => setTimeout(resolve, 100));
         } catch (skipError) {

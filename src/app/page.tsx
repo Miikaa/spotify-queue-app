@@ -1,7 +1,8 @@
 'use client';
 
 import { useSession, signIn, signOut } from "next-auth/react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import { spotifyApi } from '@/services/spotify';
 import type { SpotifyTrack } from '@/types/spotify';
@@ -9,82 +10,108 @@ import { useNotification } from '@/hooks/useNotification';
 import { NotificationContainer } from '@/components/Notification';
 import { LoadingOverlay } from '@/components/Loading';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { TrackItem } from '@/components/TrackItem';
+import { TrackListSkeleton } from '@/components/Skeleton';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { handleSpotifyError } from '@/utils/errorHandler';
 import debounce from 'lodash.debounce';
-import { SentryTest } from '@/components/SentryTest';
 
 type Tab = 'queue' | 'search';
 
 export default function Home() {
   const { data: session } = useSession();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>('queue');
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<SpotifyTrack[]>([]);
-  const [queue, setQueue] = useState<SpotifyTrack[]>([]);
-  const [currentTrack, setCurrentTrack] = useState<SpotifyTrack | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const { notifications, addNotification, removeNotification } = useNotification();
 
-  const fetchQueue = useCallback(async () => {
-    if (!session?.accessToken) {
-      console.log('No access token available');
-      return;
-    }
-
-    try {
-      const [playbackData, queueData] = await Promise.all([
-        spotifyApi.getCurrentPlayback(session.accessToken),
-        spotifyApi.getQueue(session.accessToken),
-      ]);
-
-      console.log('Current playback data:', playbackData);
-      
-      if (!playbackData) {
-        console.log('No active playback found. Make sure Spotify is playing on a device.');
-        addNotification('No active playback found. Make sure Spotify is playing on a device.', 'info');
-      }
-
-      setCurrentTrack(playbackData);
-      setQueue(queueData || []);
-    } catch (error) {
-      console.error('Error fetching player data:', error);
-      if (error instanceof Error) {
-        addNotification(error.message, 'error');
-      }
-    }
-  }, [session, addNotification]);
-
-  const debouncedSearch = useCallback(
-    (query: string, token: string) => {
-      const search = async () => {
-        if (!query.trim()) {
-          setSearchResults([]);
-          return;
-        }
-
-        try {
-          setIsLoading(true);
-          const results = await spotifyApi.searchTracks(token, query);
-          setSearchResults(results);
-        } catch (error) {
-          console.error('Error searching tracks:', error);
-          if (error instanceof Error) {
-            addNotification(error.message, 'error');
-          }
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-      const debouncedFn = debounce(search, 300);
-      debouncedFn();
-
-      // Cleanup the debounced function on each call
-      return () => {
-        debouncedFn.cancel();
-      };
+  // Queries
+  const { data: playbackData, isLoading: isLoadingPlayback } = useQuery({
+    queryKey: ['playback', session?.accessToken],
+    queryFn: async () => {
+      if (!session?.accessToken) throw new Error('No access token');
+      return spotifyApi.getCurrentPlayback(session.accessToken);
     },
-    [addNotification, setIsLoading, setSearchResults]
+    enabled: !!session?.accessToken,
+    refetchInterval: 5000,
+  });
+
+  const { data: queueData, isLoading: isLoadingQueue } = useQuery({
+    queryKey: ['queue', session?.accessToken],
+    queryFn: async () => {
+      if (!session?.accessToken) throw new Error('No access token');
+      return spotifyApi.getQueue(session.accessToken);
+    },
+    enabled: !!session?.accessToken,
+    refetchInterval: 5000,
+  });
+
+  // Search with debounce
+  const debouncedSearch = useMemo(
+    () => debounce(async (query: string, token: string) => {
+      if (!query.trim()) return;
+      const results = await spotifyApi.searchTracks(token, query);
+      queryClient.setQueryData(['search', query], results);
+    }, 300),
+    [queryClient]
   );
+
+  // Search query
+  const { data: searchResults, isLoading: isLoadingSearch } = useQuery({
+    queryKey: ['search', searchQuery],
+    queryFn: async () => {
+      if (!session?.accessToken) throw new Error('No access token');
+      return spotifyApi.searchTracks(session.accessToken, searchQuery);
+    },
+    enabled: !!session?.accessToken && !!searchQuery.trim(),
+  });
+
+  // Mutations
+  const addToQueueMutation = useMutation({
+    mutationFn: async (uri: string) => {
+      if (!session?.accessToken) throw new Error('No access token');
+      return spotifyApi.addToQueue(session.accessToken, uri);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['queue'] });
+      addNotification('Track added to queue', 'success');
+      setSearchQuery('');
+    },
+    onError: (error) => handleSpotifyError(error, { addNotification }),
+  });
+
+  const skipTrackMutation = useMutation({
+    mutationFn: async () => {
+      if (!session?.accessToken) throw new Error('No access token');
+      return spotifyApi.skipTrack(session.accessToken);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['queue'] });
+      queryClient.invalidateQueries({ queryKey: ['playback'] });
+      addNotification('Skipped to next track', 'success');
+    },
+    onError: (error) => handleSpotifyError(error, { addNotification }),
+  });
+
+  const clearQueueMutation = useMutation({
+    mutationFn: async () => {
+      if (!session?.accessToken) throw new Error('No access token');
+      return spotifyApi.clearQueue(session.accessToken);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['queue'] });
+      addNotification('Queue cleared successfully', 'success');
+    },
+    onError: (error) => handleSpotifyError(error, { addNotification }),
+  });
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onSearch: () => setActiveTab('search'),
+    onSkip: () => skipTrackMutation.mutate(),
+    onClearQueue: () => clearQueueMutation.mutate(),
+    onSwitchTab: () => setActiveTab(prev => prev === 'queue' ? 'search' : 'queue'),
+  });
 
   const handleSearch = useCallback(() => {
     if (!session?.accessToken) {
@@ -93,84 +120,12 @@ export default function Home() {
     }
 
     if (!searchQuery.trim()) {
-      setSearchResults([]);
       addNotification('Please enter a search query', 'info');
       return;
     }
 
     debouncedSearch(searchQuery, session.accessToken);
   }, [session, searchQuery, debouncedSearch, addNotification]);
-
-  const handleAddToQueue = async (trackUri: string) => {
-    if (!session?.accessToken) return;
-
-    try {
-      setIsLoading(true);
-      await spotifyApi.addToQueue(session.accessToken, trackUri);
-      await fetchQueue();
-      setSearchQuery('');
-      setSearchResults([]);
-      addNotification('Track added to queue', 'success');
-    } catch (error) {
-      console.error('Error adding to queue:', error);
-      if (error instanceof Error) {
-        addNotification(error.message, 'error');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSkipTrack = async () => {
-    if (!session?.accessToken) return;
-
-    try {
-      setIsLoading(true);
-      await spotifyApi.skipTrack(session.accessToken);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await fetchQueue();
-      addNotification('Skipped to next track', 'success');
-    } catch (error) {
-      console.error('Error skipping track:', error);
-      if (error instanceof Error) {
-        addNotification(error.message, 'error');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleClearQueue = async () => {
-    if (!session?.accessToken) return;
-
-    try {
-      setIsLoading(true);
-      await spotifyApi.clearQueue(session.accessToken);
-      await fetchQueue();
-      addNotification('Queue cleared successfully', 'success');
-    } catch (error) {
-      console.error('Error clearing queue:', error);
-      if (error instanceof Error) {
-        addNotification(error.message, 'error');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (session?.error === 'RefreshAccessTokenError') {
-      signOut(); // Force sign out to fix the session
-      addNotification('Your session has expired. Please sign in again.', 'error');
-      return;
-    }
-
-    if (session?.accessToken) {
-      fetchQueue();
-      const interval = setInterval(fetchQueue, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [session, fetchQueue, addNotification]);
 
   if (!session) {
     return (
@@ -193,7 +148,7 @@ export default function Home() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gradient-to-b from-[#181818] to-[#121212] p-4 md:p-8 relative">
-        {isLoading && <LoadingOverlay />}
+        {(isLoadingPlayback || isLoadingQueue || isLoadingSearch) && <LoadingOverlay />}
         <NotificationContainer notifications={notifications} onClose={removeNotification} />
         <div className="max-w-4xl mx-auto relative">
           <div className="flex flex-col md:flex-row justify-end items-end md:items-center gap-2 md:gap-4 mb-8">
@@ -217,25 +172,25 @@ export default function Home() {
             </button>
           </div>
 
-          {currentTrack && (
+          {playbackData && (
             <div className="bg-[#282828] p-4 rounded-lg mb-8">
               <h2 className="text-lg font-semibold text-white mb-4">Now Playing</h2>
               <div className="flex items-center gap-4">
                 <Image
-                  src={currentTrack.album.images[0]?.url}
-                  alt={currentTrack.album.name}
+                  src={playbackData.album.images[0]?.url}
+                  alt={playbackData.album.name}
                   width={64}
                   height={64}
                   className="rounded"
                 />
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-white font-medium truncate">{currentTrack.name}</h3>
+                  <h3 className="text-white font-medium truncate">{playbackData.name}</h3>
                   <p className="text-gray-400 text-sm truncate">
-                    {currentTrack.artists.map((artist) => artist.name).join(', ')}
+                    {playbackData.artists.map((artist) => artist.name).join(', ')}
                   </p>
                 </div>
                 <button
-                  onClick={handleSkipTrack}
+                  onClick={() => skipTrackMutation.mutate()}
                   className="bg-[#1DB954] text-black px-4 py-2 rounded-full font-semibold hover:bg-[#1ed760] transition-colors duration-200"
                 >
                   Skip
@@ -244,12 +199,12 @@ export default function Home() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-2 md:gap-4 mb-8">
+          <div className="flex gap-4 mb-8">
             <button
               onClick={() => setActiveTab('queue')}
-              className={`py-2 md:py-3 px-4 md:px-8 rounded-full font-semibold text-base md:text-lg transition-all duration-200 ${
+              className={`flex-1 py-2 px-4 rounded-full font-semibold transition-colors duration-200 ${
                 activeTab === 'queue'
-                  ? 'bg-[#1DB954] text-black hover:bg-[#1ed760]'
+                  ? 'bg-[#1DB954] text-black'
                   : 'bg-[#282828] text-white hover:bg-[#3E3E3E]'
               }`}
             >
@@ -257,9 +212,9 @@ export default function Home() {
             </button>
             <button
               onClick={() => setActiveTab('search')}
-              className={`py-2 md:py-3 px-4 md:px-8 rounded-full font-semibold text-base md:text-lg transition-all duration-200 ${
+              className={`flex-1 py-2 px-4 rounded-full font-semibold transition-colors duration-200 ${
                 activeTab === 'search'
-                  ? 'bg-[#1DB954] text-black hover:bg-[#1ed760]'
+                  ? 'bg-[#1DB954] text-black'
                   : 'bg-[#282828] text-white hover:bg-[#3E3E3E]'
               }`}
             >
@@ -267,124 +222,76 @@ export default function Home() {
             </button>
           </div>
 
-          {activeTab === 'search' && (
-            <div className="mb-8">
-              <div className="flex gap-2">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    placeholder="Search for tracks..."
-                    className="w-full bg-[#282828] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1DB954] pr-10"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => {
-                        setSearchQuery('');
-                        setSearchResults([]);
-                      }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white focus:outline-none"
-                      aria-label="Clear search"
-                    >
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path
-                          fillRule="evenodd"
-                          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                <button
-                  onClick={handleSearch}
-                  className="bg-[#1DB954] text-black px-6 py-2 rounded-lg font-semibold hover:bg-[#1ed760] transition-colors duration-200"
-                >
-                  Search
-                </button>
+          {activeTab === 'search' ? (
+            <div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  placeholder="Search for tracks..."
+                  className="w-full bg-[#282828] text-white px-4 py-3 rounded-lg pr-10 focus:outline-none focus:ring-2 focus:ring-[#1DB954]"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      queryClient.removeQueries({ queryKey: ['search'] });
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white focus:outline-none"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
 
-              {searchResults.length > 0 && (
+              {isLoadingSearch ? (
+                <TrackListSkeleton count={5} />
+              ) : searchResults && searchResults.length > 0 ? (
                 <div className="mt-4 space-y-2">
                   {searchResults.map((track) => (
-                    <div
+                    <TrackItem
                       key={track.id}
-                      className="flex items-center gap-4 bg-[#282828] p-4 rounded-lg hover:bg-[#3E3E3E] transition-colors duration-200"
-                    >
-                      <Image
-                        src={track.album.images[0]?.url}
-                        alt={track.album.name}
-                        width={48}
-                        height={48}
-                        className="rounded"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-white font-medium truncate">{track.name}</h3>
-                        <p className="text-gray-400 text-sm truncate">
-                          {track.artists.map((artist) => artist.name).join(', ')}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleAddToQueue(track.uri)}
-                        className="bg-[#1DB954] text-black px-4 py-2 rounded-full font-semibold hover:bg-[#1ed760] transition-colors duration-200 whitespace-nowrap"
-                      >
-                        Add to Queue
-                      </button>
-                    </div>
+                      track={track}
+                      onAddToQueue={async () => await addToQueueMutation.mutateAsync(track.uri)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                searchQuery.trim() && <p className="text-gray-400 mt-4">No results found</p>
+              )}
+            </div>
+          ) : (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold text-white">Queue</h2>
+                {queueData && queueData.length > 0 && (
+                  <button
+                    onClick={() => clearQueueMutation.mutate()}
+                    className="bg-red-600 text-white px-4 py-2 rounded-full font-semibold hover:bg-red-700 transition-colors duration-200 text-sm"
+                  >
+                    Clear Queue
+                  </button>
+                )}
+              </div>
+              {isLoadingQueue ? (
+                <TrackListSkeleton count={3} />
+              ) : queueData && queueData.length === 0 ? (
+                <p className="text-gray-400">No tracks in queue</p>
+              ) : (
+                <div className="space-y-2">
+                  {queueData?.map((track) => (
+                    <TrackItem
+                      key={track.id}
+                      track={track}
+                      onAddToQueue={async () => await addToQueueMutation.mutateAsync(track.uri)}
+                    />
                   ))}
                 </div>
               )}
             </div>
           )}
-
-          {activeTab === 'queue' && (
-            <div className="space-y-4">
-              <div className="bg-[#282828] p-4 rounded-lg">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-lg font-semibold text-white">Queue</h2>
-                  {queue.length > 0 && (
-                    <button
-                      onClick={handleClearQueue}
-                      className="bg-red-600 text-white px-4 py-2 rounded-full font-semibold hover:bg-red-700 transition-colors duration-200 text-sm"
-                    >
-                      Clear Queue
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  {queue.length === 0 ? (
-                    <p className="text-gray-400">No tracks in queue</p>
-                  ) : (
-                    queue.map((track) => (
-                      <div
-                        key={track.id}
-                        className="flex items-center gap-4 bg-[#3E3E3E] p-4 rounded-lg"
-                      >
-                        <Image
-                          src={track.album.images[0]?.url}
-                          alt={track.album.name}
-                          width={48}
-                          height={48}
-                          className="rounded"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-white font-medium truncate">{track.name}</h3>
-                          <p className="text-gray-400 text-sm truncate">
-                            {track.artists.map((artist) => artist.name).join(', ')}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="fixed bottom-4 right-4">
-          <SentryTest />
         </div>
       </div>
     </ErrorBoundary>
