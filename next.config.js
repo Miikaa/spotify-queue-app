@@ -21,9 +21,6 @@ const nextConfig = {
         hostname: '**.fbcdn.net'
       }
     ],
-  },
-  experimental: {
-    instrumentationHook: true
   }
 }
 
