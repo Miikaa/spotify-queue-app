@@ -1,5 +1,5 @@
-import { SpotifyApi } from '@spotify/web-api-ts-sdk';
-import type { SpotifyTrack } from '@/types/spotify';
+import { SpotifyApi, Track } from '@spotify/web-api-ts-sdk';
+import type { SpotifyTrack, PlaybackState } from '@/types/spotify';
 
 class SpotifyAPI {
   private api: SpotifyApi | null = null;
@@ -18,14 +18,20 @@ class SpotifyAPI {
     return this.api;
   }
 
-  async getCurrentPlayback(accessToken: string): Promise<SpotifyTrack | null> {
+  async getCurrentPlayback(accessToken: string): Promise<PlaybackState | null> {
     try {
       const api = this.getApi(accessToken);
       const playback = await api.player.getCurrentlyPlayingTrack();
-      if (!playback?.item || playback.item.type !== 'track') {
-        return null;
+      
+      // Check if the item is a track (not an episode)
+      if (playback?.item?.type === 'track') {
+        return {
+          track: playback.item as Track,
+          progress_ms: playback.progress_ms || 0,
+          is_playing: playback.is_playing || false,
+        };
       }
-      return playback.item as SpotifyTrack;
+      return null;
     } catch (error) {
       console.error('Error getting current playback:', error);
       throw error;
@@ -34,18 +40,36 @@ class SpotifyAPI {
 
   async getQueue(accessToken: string): Promise<SpotifyTrack[]> {
     try {
+      // First get the current context to check if we're in a playlist/album
+      const api = this.getApi(accessToken);
+      const playbackState = await api.player.getPlaybackState();
+      const isInContext = playbackState?.context?.type === 'playlist' || playbackState?.context?.type === 'album';
+
+      // Use fetch directly to ensure fresh data
       const response = await fetch('https://api.spotify.com/v1/me/player/queue', {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
+          'Authorization': `Bearer ${accessToken}`,
+        },
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to fetch queue');
+        throw new Error(`Failed to get queue: ${response.status} ${response.statusText}`);
       }
+
+      const data = await response.json() as { queue: Array<Track & { type: string }> };
       
-      const data = await response.json();
-      return data.queue || [];
+      // Debug log to see the structure
+      console.log('Queue response:', JSON.stringify(data, null, 2));
+      console.log('Current context:', playbackState?.context);
+
+      const queue = data.queue || [];
+      
+      // If we're in a playlist/album context, only show manually added tracks (which appear at the start)
+      // If we're not in a context, show all tracks as they're likely all manually added
+      const queueTracks = isInContext ? queue.slice(0, 3) : queue;
+      
+      return queueTracks.filter((item) => item.type === 'track') as Track[];
     } catch (error) {
       console.error('Error getting queue:', error);
       throw error;
@@ -55,7 +79,7 @@ class SpotifyAPI {
   async searchTracks(accessToken: string, query: string): Promise<SpotifyTrack[]> {
     try {
       const api = this.getApi(accessToken);
-      const results = await api.search(query, ['track'], undefined, 10);
+      const results = await api.search(query, ['track']);
       return results.tracks.items;
     } catch (error) {
       console.error('Error searching tracks:', error);
@@ -65,17 +89,24 @@ class SpotifyAPI {
 
   async addToQueue(accessToken: string, uri: string): Promise<void> {
     try {
-      const response = await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(uri)}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
+      const api = this.getApi(accessToken);
+      const devices = await api.player.getPlaybackState();
+      const deviceId = devices?.device?.id;
+
+      // Use fetch directly instead of SDK to handle non-JSON response
+      const response = await fetch(
+        `https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(uri)}${deviceId ? `&device_id=${deviceId}` : ''}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
         }
-      });
-      
+      );
+
       if (!response.ok) {
-        throw new Error('Failed to add track to queue');
+        throw new Error(`Failed to add to queue: ${response.status} ${response.statusText}`);
       }
-      // 204 No Content response is expected and OK
     } catch (error) {
       console.error('Error adding to queue:', error);
       throw error;
@@ -84,25 +115,24 @@ class SpotifyAPI {
 
   async skipTrack(accessToken: string): Promise<void> {
     try {
-      // First get the active device
       const api = this.getApi(accessToken);
-      const state = await api.player.getPlaybackState();
-      
-      if (!state?.device?.id) {
-        throw new Error('No active Spotify device found');
-      }
+      const devices = await api.player.getPlaybackState();
+      const deviceId = devices?.device?.id;
 
-      const response = await fetch(`https://api.spotify.com/v1/me/player/next?device_id=${state.device.id}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
+      // Use fetch directly instead of SDK to handle non-JSON response
+      const response = await fetch(
+        `https://api.spotify.com/v1/me/player/next${deviceId ? `?device_id=${deviceId}` : ''}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
         }
-      });
-      
+      );
+
       if (!response.ok) {
-        throw new Error('Failed to skip track');
+        throw new Error(`Failed to skip track: ${response.status} ${response.statusText}`);
       }
-      // 204 No Content response is expected and OK
     } catch (error) {
       console.error('Error skipping track:', error);
       throw error;
@@ -111,24 +141,34 @@ class SpotifyAPI {
 
   async clearQueue(accessToken: string): Promise<void> {
     try {
-      const queue = await this.getQueue(accessToken);
+      const api = this.getApi(accessToken);
+      const devices = await api.player.getPlaybackState();
+      const deviceId = devices?.device?.id;
       
-      // If queue is empty, nothing to clear
-      if (!queue.length) {
-        return;
-      }
-
-      // Skip each track in the queue
-      for (let i = 0; i < queue.length; i++) {
-        try {
-          await this.skipTrack(accessToken);
-          // Add a small delay to prevent rate limiting
-          await new Promise(resolve => setTimeout(resolve, 100));
-        } catch (skipError) {
-          console.error('Error skipping track:', skipError);
-          // Continue with next track even if one fails
-          continue;
+      // Keep skipping until queue is empty
+      while (true) {
+        const queue = await api.player.getUsersQueue();
+        if (!queue.queue.length) {
+          break;
         }
+
+        // Skip current track
+        const response = await fetch(
+          `https://api.spotify.com/v1/me/player/next${deviceId ? `?device_id=${deviceId}` : ''}`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to skip track: ${response.status} ${response.statusText}`);
+        }
+
+        // Small delay to prevent rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     } catch (error) {
       console.error('Error clearing queue:', error);

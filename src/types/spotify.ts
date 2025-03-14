@@ -1,3 +1,5 @@
+import type { Track } from '@spotify/web-api-ts-sdk';
+
 export interface SpotifyImage {
   url: string;
   height: number;
@@ -17,15 +19,12 @@ export interface SpotifyAlbum {
   images: SpotifyImage[];
 }
 
-export interface SpotifyTrack {
-  id: string;
-  name: string;
-  uri: string;
-  artists: SpotifyArtist[];
-  album: SpotifyAlbum;
-  duration_ms: number;
-  explicit: boolean;
-  is_playable: boolean;
+export type SpotifyTrack = Track;
+
+export interface PlaybackState {
+  track: SpotifyTrack;
+  progress_ms: number;
+  is_playing: boolean;
 }
 
 export interface SpotifySearchResponse {
@@ -42,7 +41,7 @@ export interface SpotifyError {
   message: string;
 }
 
-export interface SpotifySession extends Record<string, any> {
+export interface SpotifySession {
   accessToken: string;
   error?: 'RefreshAccessTokenError';
   user?: {
@@ -50,4 +49,7 @@ export interface SpotifySession extends Record<string, any> {
     email?: string | null;
     image?: string | null;
   };
+  expires_at?: number;
+  token_type?: string;
+  refresh_token?: string;
 } 

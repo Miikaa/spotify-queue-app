@@ -1,11 +1,10 @@
 'use client';
 
 import { useSession, signIn, signOut } from "next-auth/react";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import { spotifyApi } from '@/services/spotify';
-import type { SpotifyTrack } from '@/types/spotify';
 import { useNotification } from '@/hooks/useNotification';
 import { NotificationContainer } from '@/components/Notification';
 import { LoadingOverlay } from '@/components/Loading';
@@ -18,12 +17,23 @@ import debounce from 'lodash.debounce';
 
 type Tab = 'queue' | 'search';
 
+function formatTime(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 export default function Home() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>('queue');
   const [searchQuery, setSearchQuery] = useState("");
   const { notifications, addNotification, removeNotification } = useNotification();
+  
+  // Add state for real-time progress
+  const [currentProgress, setCurrentProgress] = useState(0);
+  const progressInterval = useRef<NodeJS.Timeout | null>(null);
 
   // Queries
   const { data: playbackData, isLoading: isLoadingPlayback } = useQuery({
@@ -34,6 +44,7 @@ export default function Home() {
     },
     enabled: !!session?.accessToken,
     refetchInterval: 5000,
+    gcTime: 0,
   });
 
   const { data: queueData, isLoading: isLoadingQueue } = useQuery({
@@ -44,6 +55,7 @@ export default function Home() {
     },
     enabled: !!session?.accessToken,
     refetchInterval: 5000,
+    gcTime: 0,
   });
 
   // Search with debounce
@@ -72,8 +84,10 @@ export default function Home() {
       if (!session?.accessToken) throw new Error('No access token');
       return spotifyApi.addToQueue(session.accessToken, uri);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['queue'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['queue'] });
+      // Force an immediate refetch
+      await queryClient.refetchQueries({ queryKey: ['queue'] });
       addNotification('Track added to queue', 'success');
       setSearchQuery('');
     },
@@ -85,9 +99,17 @@ export default function Home() {
       if (!session?.accessToken) throw new Error('No access token');
       return spotifyApi.skipTrack(session.accessToken);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['queue'] });
-      queryClient.invalidateQueries({ queryKey: ['playback'] });
+    onSuccess: async () => {
+      // Invalidate and immediately refetch
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['queue'] }),
+        queryClient.invalidateQueries({ queryKey: ['playback'] })
+      ]);
+      // Force an immediate refetch
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['queue'] }),
+        queryClient.refetchQueries({ queryKey: ['playback'] })
+      ]);
       addNotification('Skipped to next track', 'success');
     },
     onError: (error) => handleSpotifyError(error, { addNotification }),
@@ -127,6 +149,48 @@ export default function Home() {
     debouncedSearch(searchQuery, session.accessToken);
   }, [session, searchQuery, debouncedSearch, addNotification]);
 
+  // Update progress in real-time when playback data changes
+  useEffect(() => {
+    if (playbackData?.is_playing) {
+      // Clear any existing interval
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+      }
+
+      // Set initial progress
+      setCurrentProgress(playbackData.progress_ms);
+
+      // Update progress every second
+      progressInterval.current = setInterval(() => {
+        setCurrentProgress(prev => {
+          // If we've reached the end of the song, stop updating
+          if (prev >= playbackData.track.duration_ms) {
+            if (progressInterval.current) {
+              clearInterval(progressInterval.current);
+            }
+            return prev;
+          }
+          return prev + 1000;
+        });
+      }, 1000);
+    } else {
+      // If not playing, clear interval and sync with server progress
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+      }
+      if (playbackData) {
+        setCurrentProgress(playbackData.progress_ms);
+      }
+    }
+
+    // Cleanup interval on unmount or when playback data changes
+    return () => {
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+      }
+    };
+  }, [playbackData]);
+
   if (!session) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#121212] gap-8 px-4">
@@ -151,23 +215,31 @@ export default function Home() {
         {(isLoadingPlayback || isLoadingQueue || isLoadingSearch) && <LoadingOverlay />}
         <NotificationContainer notifications={notifications} onClose={removeNotification} />
         <div className="max-w-4xl mx-auto relative">
-          <div className="flex flex-col md:flex-row justify-end items-end md:items-center gap-2 md:gap-4 mb-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8 bg-[#282828] p-4 rounded-lg">
             <div className="flex items-center gap-3">
               {session.user?.image && (
                 <Image
                   src={session.user.image}
                   alt={session.user?.name || 'User'}
-                  width={32}
-                  height={32}
+                  width={40}
+                  height={40}
                   className="rounded-full"
                 />
               )}
-              <span className="text-white font-medium">{session.user?.name}</span>
+              <div>
+                <p className="text-sm text-gray-400">Signed in as</p>
+                <p className="text-white font-medium">{session.user?.name || 'User'}</p>
+              </div>
             </div>
             <button
               onClick={() => signOut({ callbackUrl: '/' })}
-              className="text-gray-400 hover:text-white transition-colors duration-200"
+              className="bg-red-600 text-white px-6 py-2 rounded-full font-semibold hover:bg-red-700 transition-all duration-200 hover:scale-105 flex items-center gap-2"
             >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
               Sign Out
             </button>
           </div>
@@ -177,17 +249,32 @@ export default function Home() {
               <h2 className="text-lg font-semibold text-white mb-4">Now Playing</h2>
               <div className="flex items-center gap-4">
                 <Image
-                  src={playbackData.album.images[0]?.url}
-                  alt={playbackData.album.name}
+                  src={playbackData.track.album.images[0]?.url}
+                  alt={playbackData.track.album.name}
                   width={64}
                   height={64}
                   className="rounded"
                 />
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-white font-medium truncate">{playbackData.name}</h3>
+                  <h3 className="text-white font-medium truncate">{playbackData.track.name}</h3>
                   <p className="text-gray-400 text-sm truncate">
-                    {playbackData.artists.map((artist) => artist.name).join(', ')}
+                    {playbackData.track.artists.map((artist) => artist.name).join(', ')}
                   </p>
+                  <div className="mt-2">
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <span>{formatTime(currentProgress)}</span>
+                      <div className="flex-1 h-1 bg-[#4D4D4D] rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-[#1DB954] rounded-full"
+                          style={{ 
+                            width: `${(currentProgress / playbackData.track.duration_ms) * 100}%`,
+                            transition: playbackData.is_playing ? 'width 1000ms linear' : 'none'
+                          }}
+                        />
+                      </div>
+                      <span>{formatTime(playbackData.track.duration_ms)}</span>
+                    </div>
+                  </div>
                 </div>
                 <button
                   onClick={() => skipTrackMutation.mutate()}
@@ -255,6 +342,7 @@ export default function Home() {
                       key={track.id}
                       track={track}
                       onAddToQueue={async () => await addToQueueMutation.mutateAsync(track.uri)}
+                      showAddButton={true}
                     />
                   ))}
                 </div>
@@ -286,6 +374,7 @@ export default function Home() {
                       key={track.id}
                       track={track}
                       onAddToQueue={async () => await addToQueueMutation.mutateAsync(track.uri)}
+                      showAddButton={false}
                     />
                   ))}
                 </div>
