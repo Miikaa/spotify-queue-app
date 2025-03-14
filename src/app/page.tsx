@@ -140,12 +140,18 @@ export default function Home() {
   };
 
   useEffect(() => {
+    if (session?.error === 'RefreshAccessTokenError') {
+      signOut(); // Force sign out to fix the session
+      addNotification('Your session has expired. Please sign in again.', 'error');
+      return;
+    }
+
     if (session?.accessToken) {
       fetchQueue();
       const interval = setInterval(fetchQueue, 5000);
       return () => clearInterval(interval);
     }
-  }, [session, fetchQueue]);
+  }, [session, fetchQueue, addNotification]);
 
   if (!session) {
     return (

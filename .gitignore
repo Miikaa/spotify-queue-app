@@ -18,6 +18,9 @@
 # misc
 .DS_Store
 *.pem
+.env*.local
+.env
+.env.production
 
 # debug
 npm-debug.log*
@@ -33,3 +36,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
