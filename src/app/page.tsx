@@ -53,26 +53,36 @@ export default function Home() {
   }, [session, addNotification]);
 
   const debouncedSearch = useCallback(
-    debounce(async (query: string, token: string) => {
-      if (!query.trim()) {
-        setSearchResults([]);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        const results = await spotifyApi.searchTracks(token, query);
-        setSearchResults(results);
-      } catch (error) {
-        console.error('Error searching tracks:', error);
-        if (error instanceof Error) {
-          addNotification(error.message, 'error');
+    (query: string, token: string) => {
+      const search = async () => {
+        if (!query.trim()) {
+          setSearchResults([]);
+          return;
         }
-      } finally {
-        setIsLoading(false);
-      }
-    }, 300),
-    [addNotification]
+
+        try {
+          setIsLoading(true);
+          const results = await spotifyApi.searchTracks(token, query);
+          setSearchResults(results);
+        } catch (error) {
+          console.error('Error searching tracks:', error);
+          if (error instanceof Error) {
+            addNotification(error.message, 'error');
+          }
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      const debouncedFn = debounce(search, 300);
+      debouncedFn();
+
+      // Cleanup the debounced function on each call
+      return () => {
+        debouncedFn.cancel();
+      };
+    },
+    [addNotification, setIsLoading, setSearchResults]
   );
 
   const handleSearch = useCallback(() => {
