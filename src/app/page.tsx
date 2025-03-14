@@ -1,6 +1,6 @@
 'use client';
 
-import { useSession, signIn } from "next-auth/react";
+import { useSession, signIn, signOut } from "next-auth/react";
 import { useState, useEffect, useCallback } from "react";
 import Image from 'next/image';
 import { spotifyApi } from '@/services/spotify';
@@ -34,6 +34,13 @@ export default function Home() {
         spotifyApi.getCurrentPlayback(session.accessToken),
         spotifyApi.getQueue(session.accessToken),
       ]);
+
+      console.log('Current playback data:', playbackData);
+      
+      if (!playbackData) {
+        console.log('No active playback found. Make sure Spotify is playing on a device.');
+        addNotification('No active playback found. Make sure Spotify is playing on a device.', 'info');
+      }
 
       setCurrentTrack(playbackData);
       setQueue(queueData || []);
@@ -150,7 +157,7 @@ export default function Home() {
         {isLoading && <LoadingOverlay />}
         <NotificationContainer notifications={notifications} onClose={removeNotification} />
         <div className="max-w-4xl mx-auto relative">
-          <div className="absolute right-0 -top-4 flex flex-col md:flex-row items-end md:items-center gap-2 md:gap-4">
+          <div className="flex flex-col md:flex-row justify-end items-end md:items-center gap-2 md:gap-4 mb-8">
             <div className="flex items-center gap-3">
               {session.user?.image && (
                 <Image
@@ -164,12 +171,39 @@ export default function Home() {
               <span className="text-white font-medium">{session.user?.name}</span>
             </div>
             <button
-              onClick={() => signIn('spotify', { callbackUrl: '/' })}
+              onClick={() => signOut()}
               className="text-gray-400 hover:text-white transition-colors duration-200"
             >
               Sign Out
             </button>
           </div>
+
+          {currentTrack && (
+            <div className="bg-[#282828] p-4 rounded-lg mb-8">
+              <h2 className="text-lg font-semibold text-white mb-4">Now Playing</h2>
+              <div className="flex items-center gap-4">
+                <Image
+                  src={currentTrack.album.images[0]?.url}
+                  alt={currentTrack.album.name}
+                  width={64}
+                  height={64}
+                  className="rounded"
+                />
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-white font-medium truncate">{currentTrack.name}</h3>
+                  <p className="text-gray-400 text-sm truncate">
+                    {currentTrack.artists.map((artist) => artist.name).join(', ')}
+                  </p>
+                </div>
+                <button
+                  onClick={handleSkipTrack}
+                  className="bg-[#1DB954] text-black px-4 py-2 rounded-full font-semibold hover:bg-[#1ed760] transition-colors duration-200"
+                >
+                  Skip
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-2 md:gap-4 mb-8">
             <button
@@ -248,33 +282,6 @@ export default function Home() {
 
           {activeTab === 'queue' && (
             <div className="space-y-4">
-              {currentTrack && (
-                <div className="bg-[#282828] p-4 rounded-lg">
-                  <h2 className="text-lg font-semibold text-white mb-4">Now Playing</h2>
-                  <div className="flex items-center gap-4">
-                    <Image
-                      src={currentTrack.album.images[0]?.url}
-                      alt={currentTrack.album.name}
-                      width={64}
-                      height={64}
-                      className="rounded"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-white font-medium truncate">{currentTrack.name}</h3>
-                      <p className="text-gray-400 text-sm truncate">
-                        {currentTrack.artists.map((artist) => artist.name).join(', ')}
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleSkipTrack}
-                      className="bg-[#1DB954] text-black px-4 py-2 rounded-full font-semibold hover:bg-[#1ed760] transition-colors duration-200"
-                    >
-                      Skip
-                    </button>
-                  </div>
-                </div>
-              )}
-
               <div className="bg-[#282828] p-4 rounded-lg">
                 <h2 className="text-lg font-semibold text-white mb-4">Queue</h2>
                 <div className="space-y-2">

@@ -28,7 +28,8 @@ export const spotifyApi = {
     }
 
     const data = await handleResponse(response).then(r => r.json());
-    return data?.item as SpotifyTrack | null;
+    // Return the currently playing track if it exists
+    return data?.item || null;
   },
 
   async getQueue(accessToken: string) {
