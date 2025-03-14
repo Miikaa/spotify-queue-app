@@ -1,0 +1,58 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id
+  name          String
+  email         String?
+  image         String?
+  hostedRooms   Room[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Room {
+  id             String          @id @default(cuid())
+  code           String          @unique // 6-digit room code
+  hostId         String          // Spotify user ID of the host
+  host           User            @relation(fields: [hostId], references: [id])
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  active         Boolean         @default(true)
+  queue          Queue[]
+  connectedUsers ConnectedUser[]
+}
+
+model Queue {
+  id        String   @id @default(cuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id])
+  trackUri  String   // Spotify track URI
+  trackName String   // Track name for display
+  addedBy   String   // Could be host ID or "guest"
+  addedAt   DateTime @default(now())
+  played    Boolean  @default(false)
+}
+
+model ConnectedUser {
+  id        String   @id @default(cuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id])
+  userId    String   // Guest ID or user ID
+  joinedAt  DateTime @default(now())
+  lastSeen  DateTime @default(now())
+
+  @@unique([roomId, userId])
+}
