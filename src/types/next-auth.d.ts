@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 import 'next-auth';
+=======
+/// <reference types="next-auth" />
+>>>>>>> Stashed changes
 
 declare module 'next-auth' {
   interface Session {

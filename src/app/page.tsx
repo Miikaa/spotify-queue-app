@@ -1,5 +1,6 @@
 'use client';
 
+<<<<<<< Updated upstream
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -34,6 +35,18 @@ export default function Home() {
   // Add state for real-time progress
   const [currentProgress, setCurrentProgress] = useState(0);
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
+=======
+import { signIn, useSession } from 'next-auth/react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { toast, Toaster } from 'react-hot-toast';
+
+export default function Home() {
+  const { status } = useSession();
+  const [roomCode, setRoomCode] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
+  const router = useRouter();
+>>>>>>> Stashed changes
 
   // Queries
   const { data: playbackData, isLoading: isLoadingPlayback } = useQuery({
@@ -141,9 +154,44 @@ export default function Home() {
       return;
     }
 
+<<<<<<< Updated upstream
     if (!searchQuery.trim()) {
       addNotification('Please enter a search query', 'info');
       return;
+=======
+    setIsJoining(true);
+    try {
+      const response = await fetch('/api/room/join', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ roomCode }),
+      });
+
+      if (response.ok) {
+        router.push(`/dashboard?guest=${roomCode}`);
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to join room', {
+          style: {
+            background: '#ff4444',
+            color: '#fff',
+            borderRadius: '8px',
+          },
+        });
+      }
+    } catch {
+      toast.error('Failed to join room', {
+        style: {
+          background: '#ff4444',
+          color: '#fff',
+          borderRadius: '8px',
+        },
+      });
+    } finally {
+      setIsJoining(false);
+>>>>>>> Stashed changes
     }
 
     debouncedSearch(searchQuery, session.accessToken);
