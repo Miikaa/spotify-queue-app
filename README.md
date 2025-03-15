@@ -8,7 +8,6 @@ A real-time collaborative queue app for Spotify, built with Next.js, Prisma, and
 - Real-time queue updates
 - Search and add tracks from Spotify's library
 - Guest mode - no login required for guests
-- Admin dashboard for room management
 
 ## Deployment Guide
 
@@ -44,7 +43,6 @@ A real-time collaborative queue app for Spotify, built with Next.js, Prisma, and
    NEXTAUTH_URL=https://your-domain.com
    NEXTAUTH_SECRET=generate_a_random_string
    DATABASE_URL=your_supabase_connection_string
-   ADMIN_PASSWORD=choose_a_secure_password
    ```
 4. Deploy!
 
@@ -77,7 +75,6 @@ After the first deployment, you need to run the database migrations:
 1. Test the application by creating a room and joining as a guest
 2. Verify that Spotify authentication works
 3. Check that real-time updates are working
-4. Test the admin dashboard at `/admin` (use the ADMIN_PASSWORD you set)
 
 ## Development
 
@@ -99,7 +96,6 @@ After the first deployment, you need to run the database migrations:
 - `NEXTAUTH_URL`: Your application URL (http://localhost:3000 for development)
 - `NEXTAUTH_SECRET`: A random string for session encryption
 - `DATABASE_URL`: Your Supabase PostgreSQL connection string
-- `ADMIN_PASSWORD`: Password for accessing the admin dashboard
 - `SENTRY_DSN` (optional): Sentry error tracking DSN
 
 ## Tech Stack
