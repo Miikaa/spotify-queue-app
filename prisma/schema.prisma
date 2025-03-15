@@ -1,0 +1,37 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+model Room {
+  id              String   @id @default(uuid())
+  code            String   @unique
+  hostId          String
+  hostName        String
+  hostImage       String?
+  hostAccessToken String
+  hostRefreshToken String
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  queue           Queue[]
+}
+
+model Queue {
+  id        String   @id @default(uuid())
+  roomId    String
+  trackUri  String
+  trackName String
+  addedAt   DateTime @default(now())
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+} 
