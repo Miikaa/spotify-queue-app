@@ -12,10 +12,10 @@ interface SpotifyError {
 // GET /api/room/[code]/queue
 export async function GET(
   request: Request,
-  { params }: { params: { code: string } }
+  context: { params: { code: string } }
 ) {
   try {
-    const { code } = params;
+    const { code } = context.params;
 
     // Find the room
     const room = await prisma.room.findUnique({
@@ -53,10 +53,10 @@ export async function GET(
 // POST /api/room/[code]/queue
 export async function POST(
   request: Request,
-  { params }: { params: { code: string } }
+  context: { params: { code: string } }
 ) {
   try {
-    const { code } = params;
+    const { code } = context.params;
     const { trackUri } = await request.json();
 
     // Find the room

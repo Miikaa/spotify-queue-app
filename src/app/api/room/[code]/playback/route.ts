@@ -76,10 +76,10 @@ async function refreshAccessToken(refreshToken: string): Promise<AccessToken | n
 
 export async function GET(
   request: Request,
-  { params }: { params: { code: string } }
+  context: { params: { code: string } }
 ) {
   try {
-    const { code } = params;
+    const { code } = context.params;
 
     // Find the room and check if it's active
     const room = await prisma.room.findUnique({
