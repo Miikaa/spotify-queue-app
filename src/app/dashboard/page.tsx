@@ -741,9 +741,11 @@ export default function Dashboard() {
       />
       {/* User info header */}
       <div className="bg-[#181818] px-4 sm:px-8 py-4 border-b border-[#282828]">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between max-w-7xl mx-auto gap-4 sm:gap-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-4 max-w-7xl mx-auto">
+          {/* User info and room details */}
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-3">
+              {/* Profile Image */}
               {(guestRoomCode && hostInfo?.hostImage) ? (
                 <div className="relative w-10 h-10 flex-shrink-0">
                   <Image
@@ -765,29 +767,25 @@ export default function Dashboard() {
                   />
                 </div>
               )}
-              <div className="flex flex-col">
-                <span className="font-medium">
+              
+              {/* Name and Room Info */}
+              <div className="flex flex-col min-w-0">
+                <span className="font-medium truncate">
                   {guestRoomCode 
                     ? `${hostInfo?.hostName}'s Room`
                     : session?.user?.name || 'Anonymous User'
                   }
                 </span>
-                <span className="text-sm text-[#B3B3B3]">
+                <span className="text-sm text-[#B3B3B3] truncate">
                   {!roomId ? 'No Active Room' : (
                     <span className="flex items-center gap-2">
-                      <span>Room: {roomId}</span>
-                      {hostInfo?.connectedUsers && (
-                        <>
-                          <span className="text-[#1DB954]">•</span>
-                          <span>{hostInfo.connectedUsers} connected</span>
-                        </>
-                      )}
+                      <span className="truncate">Room: {roomId}</span>
                     </span>
                   )}
                 </span>
               </div>
             </div>
-            
+
             {/* Mobile buttons */}
             <div className="flex items-center gap-2 sm:hidden">
               {guestRoomCode ? (
@@ -798,7 +796,7 @@ export default function Dashboard() {
                     isLoading ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
-                  {isLoading ? 'Leaving...' : 'Leave Room'}
+                  {isLoading ? 'Leaving...' : 'Leave'}
                 </button>
               ) : (
                 <button
@@ -810,7 +808,7 @@ export default function Dashboard() {
                       : 'bg-[#1DB954] hover:bg-[#1ed760]'
                   } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  {isLoading ? 'Processing...' : (roomId ? 'Destroy Room' : 'Create Room')}
+                  {isLoading ? '...' : (roomId ? 'Destroy' : 'Create')}
                 </button>
               )}
               <button
@@ -820,7 +818,7 @@ export default function Dashboard() {
                   isLoading ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
-                Sign Out
+                Logout
               </button>
             </div>
 
@@ -856,7 +854,7 @@ export default function Dashboard() {
                   isLoading ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
-                Sign Out
+                Logout
               </button>
             </div>
           </div>
