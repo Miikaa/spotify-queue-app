@@ -2,7 +2,7 @@
 
 import { useSession, signOut } from 'next-auth/react';
 import { useState, useEffect, useRef } from 'react';
-import { redirect, useSearchParams } from 'next/navigation';
+import { redirect, useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Toaster, toast } from 'react-hot-toast';
@@ -63,6 +63,7 @@ export default function Dashboard() {
   const [addToQueueLoading, setAddToQueueLoading] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState<boolean>(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const router = useRouter();
 
   // Initialize roomId from localStorage after mount
   useEffect(() => {
@@ -699,6 +700,33 @@ export default function Dashboard() {
     syncTokens();
   }, [session?.user?.accessToken, roomId]);
 
+  const handleLeaveRoom = async () => {
+    if (isLoading) return;
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch('/api/room/leave', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ roomCode: guestRoomCode }),
+      });
+
+      if (response.ok) {
+        toast.success('Left room successfully!', successToastStyle);
+        router.push('/');
+      } else {
+        throw new Error('Failed to leave room');
+      }
+    } catch (error) {
+      console.error('Error leaving room:', error);
+      toast.error('Failed to leave room', errorToastStyle);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#121212] text-white">
       <Toaster
@@ -760,8 +788,19 @@ export default function Dashboard() {
               </div>
             </div>
             
-            {!guestRoomCode && (
-              <div className="flex items-center gap-2 sm:hidden">
+            {/* Mobile buttons */}
+            <div className="flex items-center gap-2 sm:hidden">
+              {guestRoomCode ? (
+                <button
+                  onClick={handleLeaveRoom}
+                  disabled={isLoading}
+                  className={`px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors ${
+                    isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isLoading ? 'Leaving...' : 'Leave Room'}
+                </button>
+              ) : (
                 <button
                   onClick={roomId ? handleDestroyRoom : handleCreateRoom}
                   disabled={isLoading}
@@ -773,32 +812,43 @@ export default function Dashboard() {
                 >
                   {isLoading ? 'Processing...' : (roomId ? 'Destroy Room' : 'Create Room')}
                 </button>
+              )}
+              <button
+                onClick={handleSignOut}
+                disabled={isLoading}
+                className={`px-3 py-2 bg-[#282828] text-white text-sm rounded-lg hover:bg-[#383838] transition-colors ${
+                  isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                Sign Out
+              </button>
+            </div>
+
+            {/* Desktop buttons */}
+            <div className="hidden sm:flex items-center gap-4">
+              {guestRoomCode ? (
                 <button
-                  onClick={handleSignOut}
+                  onClick={handleLeaveRoom}
                   disabled={isLoading}
-                  className={`px-3 py-2 bg-[#282828] text-white text-sm rounded-lg hover:bg-[#383838] transition-colors ${
+                  className={`px-4 py-2 bg-red-600 text-white text-base rounded-lg hover:bg-red-700 transition-colors ${
                     isLoading ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
-                  Sign Out
+                  {isLoading ? 'Leaving...' : 'Leave Room'}
                 </button>
-              </div>
-            )}
-          </div>
-          
-          {!guestRoomCode && (
-            <div className="hidden sm:flex items-center gap-4">
-              <button
-                onClick={roomId ? handleDestroyRoom : handleCreateRoom}
-                disabled={isLoading}
-                className={`px-4 py-2 text-white text-base rounded-lg transition-colors ${
-                  roomId 
-                    ? 'bg-red-600 hover:bg-red-700' 
-                    : 'bg-[#1DB954] hover:bg-[#1ed760]'
-                } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                {isLoading ? 'Processing...' : (roomId ? 'Destroy Room' : 'Create Room')}
-              </button>
+              ) : (
+                <button
+                  onClick={roomId ? handleDestroyRoom : handleCreateRoom}
+                  disabled={isLoading}
+                  className={`px-4 py-2 text-white text-base rounded-lg transition-colors ${
+                    roomId 
+                      ? 'bg-red-600 hover:bg-red-700' 
+                      : 'bg-[#1DB954] hover:bg-[#1ed760]'
+                  } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isLoading ? 'Processing...' : (roomId ? 'Destroy Room' : 'Create Room')}
+                </button>
+              )}
               <button
                 onClick={handleSignOut}
                 disabled={isLoading}
@@ -809,7 +859,7 @@ export default function Dashboard() {
                 Sign Out
               </button>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
