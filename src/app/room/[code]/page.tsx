@@ -5,6 +5,7 @@ import CurrentTrack from '@/components/room/CurrentTrack';
 import Queue from '@/components/room/Queue';
 import TrackSearch from '@/components/room/TrackSearch';
 import { prisma } from '@/lib/prisma';
+import Button from '@/components/ui/Button';
 
 interface RoomPageProps {
   params: {
@@ -63,6 +64,22 @@ export default async function RoomPage({ params }: RoomPageProps) {
               <TrackSearch roomCode={code} />
             </div>
           </div>
+
+          <Button
+            variant="ghost"
+            onClick={handleLeave}
+            disabled={isLeaving}
+            className="w-full"
+          >
+            {isLeaving ? (
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                Leaving...
+              </div>
+            ) : (
+              'Leave'
+            )}
+          </Button>
         </div>
       </main>
     );

@@ -6,6 +6,7 @@ import { redirect, useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Toaster, toast } from 'react-hot-toast';
+import Button from '@/components/ui/Button';
 
 interface Track {
   id: string;
@@ -804,62 +805,51 @@ export default function Dashboard() {
                 </button>
               ) : (
                 <>
-                  <button
-                    onClick={roomId ? handleDestroyRoom : handleCreateRoom}
+                  <Button
+                    variant="primary"
+                    onClick={handleCreateRoom}
                     disabled={isLoading}
-                    className={`px-3 py-2 text-white text-sm rounded-lg transition-colors ${
-                      roomId 
-                        ? 'bg-red-600 hover:bg-red-700' 
-                        : 'bg-[#1DB954] hover:bg-[#1ed760]'
-                    } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className="w-full"
                   >
-                    {isLoading ? '...' : (roomId ? 'Destroy' : 'Create')}
-                  </button>
-                  <button
-                    onClick={async () => {
-                      try {
-                        await Promise.all([
-                          fetchCurrentTrack(),
-                          fetchQueue()
-                        ]);
-                        toast.success('Refreshed successfully', {
-                          duration: 2000,
-                          position: 'top-center',
-                          style: {
-                            background: '#1DB954',
-                            color: '#fff',
-                            borderRadius: '8px',
-                          },
-                        });
-                      } catch (error) {
-                        console.error('Error refreshing:', error);
-                        toast.error('Failed to refresh', {
-                          duration: 2000,
-                          position: 'top-center',
-                          style: {
-                            background: '#ff4444',
-                            color: '#fff',
-                            borderRadius: '8px',
-                          },
-                        });
-                      }
-                    }}
-                    className="p-2 text-white hover:text-[#1DB954] transition-colors"
-                    title="Refresh"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                      <path fillRule="evenodd" d="M4.755 10.059a7.5 7.5 0 0112.548-3.364l1.903 1.903h-3.183a.75.75 0 100 1.5h4.992a.75.75 0 00.75-.75V4.356a.75.75 0 00-1.5 0v3.18l-1.9-1.9A9 9 0 003.306 9.67a.75.75 0 101.45.388zm15.408 3.352a.75.75 0 00-.919.53 7.5 7.5 0 01-12.548 3.364l-1.902-1.903h3.183a.75.75 0 000-1.5H2.984a.75.75 0 00-.75.75v4.992a.75.75 0 001.5 0v-3.18l1.9 1.9a9 9 0 0015.059-4.035.75.75 0 00-.53-.918z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={handleSignOut}
+                    {isLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Creating Room...
+                      </div>
+                    ) : (
+                      'Create Room'
+                    )}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={handleDestroyRoom}
                     disabled={isLoading}
-                    className={`px-3 py-2 bg-[#282828] text-white text-sm rounded-lg hover:bg-[#383838] transition-colors ${
-                      isLoading ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
+                    className="w-full"
                   >
-                    Logout
-                  </button>
+                    {isLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Destroying Room...
+                      </div>
+                    ) : (
+                      'Destroy Room'
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => signOut()}
+                    disabled={isLoading}
+                    className="w-full"
+                  >
+                    {isLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Signing Out...
+                      </div>
+                    ) : (
+                      'Logout'
+                    )}
+                  </Button>
                 </>
               )}
             </div>
@@ -878,62 +868,48 @@ export default function Dashboard() {
                 </button>
               ) : (
                 <>
-                  <button
-                    onClick={roomId ? handleDestroyRoom : handleCreateRoom}
+                  <Button
+                    variant="primary"
+                    onClick={handleCreateRoom}
                     disabled={isLoading}
-                    className={`px-4 py-2 text-white text-base rounded-lg transition-colors ${
-                      roomId 
-                        ? 'bg-red-600 hover:bg-red-700' 
-                        : 'bg-[#1DB954] hover:bg-[#1ed760]'
-                    } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    {isLoading ? 'Processing...' : (roomId ? 'Destroy Room' : 'Create Room')}
-                  </button>
-                  <button
-                    onClick={async () => {
-                      try {
-                        await Promise.all([
-                          fetchCurrentTrack(),
-                          fetchQueue()
-                        ]);
-                        toast.success('Refreshed successfully', {
-                          duration: 2000,
-                          position: 'top-center',
-                          style: {
-                            background: '#1DB954',
-                            color: '#fff',
-                            borderRadius: '8px',
-                          },
-                        });
-                      } catch (error) {
-                        console.error('Error refreshing:', error);
-                        toast.error('Failed to refresh', {
-                          duration: 2000,
-                          position: 'top-center',
-                          style: {
-                            background: '#ff4444',
-                            color: '#fff',
-                            borderRadius: '8px',
-                          },
-                        });
-                      }
-                    }}
-                    className="p-2 text-white hover:text-[#1DB954] transition-colors"
-                    title="Refresh"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                      <path fillRule="evenodd" d="M4.755 10.059a7.5 7.5 0 0112.548-3.364l1.903 1.903h-3.183a.75.75 0 100 1.5h4.992a.75.75 0 00.75-.75V4.356a.75.75 0 00-1.5 0v3.18l-1.9-1.9A9 9 0 003.306 9.67a.75.75 0 101.45.388zm15.408 3.352a.75.75 0 00-.919.53 7.5 7.5 0 01-12.548 3.364l-1.902-1.903h3.183a.75.75 0 000-1.5H2.984a.75.75 0 00-.75.75v4.992a.75.75 0 001.5 0v-3.18l1.9 1.9a9 9 0 0015.059-4.035.75.75 0 00-.53-.918z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={handleSignOut}
+                    {isLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Creating Room...
+                      </div>
+                    ) : (
+                      'Create Room'
+                    )}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={handleDestroyRoom}
                     disabled={isLoading}
-                    className={`px-4 py-2 bg-[#282828] text-white text-base rounded-lg hover:bg-[#383838] transition-colors ${
-                      isLoading ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
                   >
-                    Logout
-                  </button>
+                    {isLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Destroying Room...
+                      </div>
+                    ) : (
+                      'Destroy Room'
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => signOut()}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Signing Out...
+                      </div>
+                    ) : (
+                      'Logout'
+                    )}
+                  </Button>
                 </>
               )}
             </div>
