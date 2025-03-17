@@ -15,7 +15,11 @@ const prismaClientSingleton = () => {
   });
 };
 
-export const prisma = globalThis.prisma ?? prismaClientSingleton();
+// In development, use a global variable to prevent multiple instances
+// In production, create a new instance for each request
+export const prisma = process.env.NODE_ENV === 'production' 
+  ? prismaClientSingleton()
+  : (globalThis.prisma ?? prismaClientSingleton());
 
 if (process.env.NODE_ENV !== 'production') {
   globalThis.prisma = prisma;
