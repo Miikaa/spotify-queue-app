@@ -481,12 +481,9 @@ export default function Dashboard() {
         
         if (response.ok) {
           toast.success('Track skipped', successToastStyle);
-          // Wait a bit for Spotify to update
-          setTimeout(async () => {
-            await fetchCurrentTrack();
-            await fetchQueue();
-            setIsSkipLoading(false);
-          }, 500);
+          await fetchCurrentTrack();
+          await fetchQueue();
+          setIsSkipLoading(false);
           return;
         } else {
           const data = await response.json();
@@ -502,12 +499,9 @@ export default function Dashboard() {
         });
         
         if (response.ok) {
-          // Wait a bit for Spotify to update
-          setTimeout(async () => {
-            await fetchCurrentTrack();
-            await fetchQueue();
-            setIsSkipLoading(false);
-          }, 500);
+          await fetchCurrentTrack();
+          await fetchQueue();
+          setIsSkipLoading(false);
           return;
         } else {
           throw new Error('Failed to skip track');
