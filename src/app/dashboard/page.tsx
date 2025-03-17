@@ -30,14 +30,11 @@ interface SessionUser {
   email?: string;
   image?: string;
   accessToken?: string;
-  refreshToken?: string;
-  id?: string;
 }
 
 interface Session {
   user?: SessionUser;
   expires: string;
-  error?: string;
 }
 
 interface HostInfo {
@@ -140,55 +137,15 @@ export default function Dashboard() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const refreshAccessToken = async () => {
-    if (!session?.user?.refreshToken) return null;
-    
-    try {
-      const response = await fetch('https://accounts.spotify.com/api/token', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${Buffer.from(
-            `${process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
-          ).toString('base64')}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: session.user.refreshToken,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to refresh token');
-      
-      const data = await response.json();
-      return data.access_token;
-    } catch (error) {
-      console.error('Error refreshing token:', error);
-      return null;
-    }
-  };
-
   const fetchCurrentTrack = async () => {
     if (!session?.user?.accessToken) return;
     
     try {
-      let response = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+      const response = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
         headers: {
           Authorization: `Bearer ${session.user.accessToken}`,
         },
       });
-      
-      if (response.status === 401) {
-        // Token expired, try to refresh
-        const newToken = await refreshAccessToken();
-        if (!newToken) return;
-        
-        response = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-          headers: {
-            Authorization: `Bearer ${newToken}`,
-          },
-        });
-      }
       
       if (response.ok) {
         const data: PlaybackState = await response.json();
@@ -233,23 +190,11 @@ export default function Dashboard() {
     if (!session?.user?.accessToken) return;
     
     try {
-      let response = await fetch('https://api.spotify.com/v1/me/player/queue', {
+      const response = await fetch('https://api.spotify.com/v1/me/player/queue', {
         headers: {
           Authorization: `Bearer ${session.user.accessToken}`,
         },
       });
-      
-      if (response.status === 401) {
-        // Token expired, try to refresh
-        const newToken = await refreshAccessToken();
-        if (!newToken) return;
-        
-        response = await fetch('https://api.spotify.com/v1/me/player/queue', {
-          headers: {
-            Authorization: `Bearer ${newToken}`,
-          },
-        });
-      }
       
       if (response.ok) {
         const data = await response.json();
