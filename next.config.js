@@ -17,12 +17,6 @@ const nextConfig = {
         hostname: '*.googleusercontent.com',
       },
     ],
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
   }
 }
 

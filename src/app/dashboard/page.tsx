@@ -6,8 +6,6 @@ import { redirect, useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Toaster, toast } from 'react-hot-toast';
-import Button from '@/components/ui/Button';
-import { Room } from '@prisma/client';
 
 interface Track {
   id: string;
@@ -66,12 +64,6 @@ export default function Dashboard() {
   const [isVisible, setIsVisible] = useState<boolean>(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const router = useRouter();
-  const [isCreating, setIsCreating] = useState(false);
-  const [isDestroying, setIsDestroying] = useState(false);
-  const [isLeaving, setIsLeaving] = useState(false);
-  const [activeRoom, setActiveRoom] = useState<Room | null>(null);
-  const [isJoining, setIsJoining] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Initialize roomId from localStorage after mount
   useEffect(() => {
@@ -510,7 +502,6 @@ export default function Dashboard() {
         });
         
         if (response.ok) {
-          toast.success('Track skipped', successToastStyle);
           // Wait a bit for Spotify to update
           setTimeout(async () => {
             await fetchCurrentTrack();
@@ -524,10 +515,7 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error skipping track:', error);
-      // Only show error toast if the skip actually failed
-      if (!isSkipLoading) {
-        toast.error(error instanceof Error ? error.message : 'Failed to skip track', errorToastStyle);
-      }
+      toast.error(error instanceof Error ? error.message : 'Failed to skip track', errorToastStyle);
     }
     setIsSkipLoading(false);
   };
@@ -739,28 +727,6 @@ export default function Dashboard() {
     }
   };
 
-  // Add this new function to check for active room
-  const checkActiveRoom = async () => {
-    if (!session?.user?.id) return;
-    
-    try {
-      const response = await fetch('/api/room/status');
-      if (response.ok) {
-        const data = await response.json();
-        setActiveRoom(data.room);
-      }
-    } catch (error) {
-      console.error('Error checking room status:', error);
-    }
-  };
-
-  // Add this to your useEffect that runs on mount
-  useEffect(() => {
-    if (status === 'authenticated') {
-      checkActiveRoom();
-    }
-  }, [status]);
-
   return (
     <div className="min-h-screen bg-[#121212] text-white">
       <Toaster
@@ -821,127 +787,75 @@ export default function Dashboard() {
             </div>
 
             {/* Mobile buttons */}
-            <div className="flex flex-col gap-2">
-              {!guestRoomCode ? (
-                <>
-                  {!activeRoom ? (
-                    <Button
-                      variant="primary"
-                      onClick={handleCreateRoom}
-                      disabled={isCreating}
-                      className="w-full"
-                    >
-                      {isCreating ? (
-                        <div className="flex items-center gap-2">
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          Creating...
-                        </div>
-                      ) : (
-                        'Create Room'
-                      )}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      onClick={handleDestroyRoom}
-                      disabled={isDestroying}
-                      className="w-full"
-                    >
-                      {isDestroying ? (
-                        <div className="flex items-center gap-2">
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          Destroying...
-                        </div>
-                      ) : (
-                        'Destroy Room'
-                      )}
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    onClick={() => signOut()}
-                    className="w-full"
-                  >
-                    Sign Out
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="ghost"
+            <div className="flex items-center gap-2 sm:hidden">
+              {guestRoomCode ? (
+                <button
                   onClick={handleLeaveRoom}
-                  disabled={isLeaving}
-                  className="w-full"
+                  disabled={isLoading}
+                  className={`px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors ${
+                    isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
-                  {isLeaving ? (
-                    <div className="flex items-center gap-2">
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      Leaving...
-                    </div>
-                  ) : (
-                    'Leave'
-                  )}
-                </Button>
+                  {isLoading ? 'Leaving...' : 'Leave'}
+                </button>
+              ) : (
+                <button
+                  onClick={roomId ? handleDestroyRoom : handleCreateRoom}
+                  disabled={isLoading}
+                  className={`px-3 py-2 text-white text-sm rounded-lg transition-colors ${
+                    roomId 
+                      ? 'bg-red-600 hover:bg-red-700' 
+                      : 'bg-[#1DB954] hover:bg-[#1ed760]'
+                  } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isLoading ? '...' : (roomId ? 'Destroy' : 'Create')}
+                </button>
               )}
+              <button
+                onClick={handleSignOut}
+                disabled={isLoading}
+                className={`px-3 py-2 bg-[#282828] text-white text-sm rounded-lg hover:bg-[#383838] transition-colors ${
+                  isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                Logout
+              </button>
             </div>
 
             {/* Desktop buttons */}
-            <div className="flex items-center gap-4">
-              {!guestRoomCode ? (
-                <>
-                  {!activeRoom ? (
-                    <Button
-                      variant="primary"
-                      onClick={handleCreateRoom}
-                      disabled={isCreating}
-                    >
-                      {isCreating ? (
-                        <div className="flex items-center gap-2">
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          Creating...
-                        </div>
-                      ) : (
-                        'Create Room'
-                      )}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      onClick={handleDestroyRoom}
-                      disabled={isDestroying}
-                    >
-                      {isDestroying ? (
-                        <div className="flex items-center gap-2">
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          Destroying...
-                        </div>
-                      ) : (
-                        'Destroy Room'
-                      )}
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    onClick={() => signOut()}
-                  >
-                    Sign Out
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="ghost"
+            <div className="hidden sm:flex items-center gap-4">
+              {guestRoomCode ? (
+                <button
                   onClick={handleLeaveRoom}
-                  disabled={isLeaving}
+                  disabled={isLoading}
+                  className={`px-4 py-2 bg-red-600 text-white text-base rounded-lg hover:bg-red-700 transition-colors ${
+                    isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
-                  {isLeaving ? (
-                    <div className="flex items-center gap-2">
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      Leaving...
-                    </div>
-                  ) : (
-                    'Leave'
-                  )}
-                </Button>
+                  {isLoading ? 'Leaving...' : 'Leave Room'}
+                </button>
+              ) : (
+                <button
+                  onClick={roomId ? handleDestroyRoom : handleCreateRoom}
+                  disabled={isLoading}
+                  className={`px-4 py-2 text-white text-base rounded-lg transition-colors ${
+                    roomId 
+                      ? 'bg-red-600 hover:bg-red-700' 
+                      : 'bg-[#1DB954] hover:bg-[#1ed760]'
+                  } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isLoading ? 'Processing...' : (roomId ? 'Destroy Room' : 'Create Room')}
+                </button>
               )}
+              <button
+                onClick={handleSignOut}
+                disabled={isLoading}
+                className={`px-4 py-2 bg-[#282828] text-white text-base rounded-lg hover:bg-[#383838] transition-colors ${
+                  isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>
@@ -973,19 +887,15 @@ export default function Dashboard() {
                       </p>
                       <p className="text-[#B3B3B3] text-sm sm:text-base">{currentTrack.album.name}</p>
                     </div>
-                    <div className="flex gap-2">
-                      {!guestRoomCode && (
-                        <button
-                          onClick={handleSkip}
-                          disabled={isSkipLoading}
-                          className={`px-4 py-2 bg-[#1DB954] text-white text-sm sm:text-base rounded-lg hover:bg-[#1ed760] transition-colors flex-shrink-0 ${
-                            isSkipLoading ? 'opacity-50 cursor-not-allowed' : ''
-                          }`}
-                        >
-                          {isSkipLoading ? 'Skipping...' : 'Skip'}
-                        </button>
-                      )}
-                    </div>
+                    <button
+                      onClick={handleSkip}
+                      disabled={isSkipLoading}
+                      className={`px-4 py-2 bg-[#1DB954] text-white text-sm sm:text-base rounded-lg hover:bg-[#1ed760] transition-colors flex-shrink-0 ${
+                        isSkipLoading ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      {isSkipLoading ? 'Skipping...' : 'Skip'}
+                    </button>
                   </div>
                 </div>
               </div>

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
-import { prisma } from '@/lib/prisma';
+
+const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {
@@ -17,12 +19,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if room exists and is active
+    // Check if room exists with host information
     const room = await prisma.room.findUnique({
-      where: { 
-        code: roomCode,
-        active: true 
-      },
+      where: { code: roomCode },
       include: {
         host: true,
         connectedUsers: true,
@@ -31,7 +30,7 @@ export async function POST(request: Request) {
 
     if (!room) {
       return NextResponse.json(
-        { error: 'Room not found or inactive' },
+        { error: 'Room not found' },
         { status: 404 }
       );
     }
@@ -39,66 +38,58 @@ export async function POST(request: Request) {
     // Generate a unique ID for guest users
     const userId = session?.user?.id || `guest-${uuidv4()}`;
 
-    try {
-      // Update or create connected user entry
-      await prisma.connectedUser.upsert({
-        where: {
-          roomId_userId: {
-            roomId: room.id,
-            userId: userId,
-          },
-        },
-        update: {
-          lastSeen: new Date(),
-        },
-        create: {
+    // Update or create connected user entry
+    await prisma.connectedUser.upsert({
+      where: {
+        roomId_userId: {
           roomId: room.id,
           userId: userId,
-          lastSeen: new Date(),
         },
-      });
+      },
+      update: {
+        lastSeen: new Date(),
+      },
+      create: {
+        roomId: room.id,
+        userId: userId,
+        lastSeen: new Date(),
+      },
+    });
 
-      // Clean up inactive users (not seen in the last 5 minutes)
-      await prisma.connectedUser.deleteMany({
-        where: {
-          roomId: room.id,
-          lastSeen: {
-            lt: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
-          },
+    // Clean up inactive users (not seen in the last 5 minutes)
+    await prisma.connectedUser.deleteMany({
+      where: {
+        roomId: room.id,
+        lastSeen: {
+          lt: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
         },
-      });
+      },
+    });
 
-      // Get updated connected users count
-      const connectedUsers = await prisma.connectedUser.count({
-        where: {
-          roomId: room.id,
-          lastSeen: {
-            gt: new Date(Date.now() - 5 * 60 * 1000), // Active in last 5 minutes
-          },
+    // Get updated connected users count
+    const connectedUsers = await prisma.connectedUser.count({
+      where: {
+        roomId: room.id,
+        lastSeen: {
+          gt: new Date(Date.now() - 5 * 60 * 1000), // Active in last 5 minutes
         },
-      });
+      },
+    });
 
-      // Return room info with host details and connected users count
-      return NextResponse.json({
-        room: {
-          code: room.code,
-          hostId: room.hostId,
-          hostName: room.host.name,
-          hostImage: room.host.image,
-          connectedUsers: connectedUsers + 1, // +1 to include the host
-        },
-      });
-    } catch (dbError) {
-      console.error('Database error while joining room:', dbError);
-      return NextResponse.json(
-        { error: 'Failed to join room' },
-        { status: 500 }
-      );
-    }
+    // Return room info with host details and connected users count
+    return NextResponse.json({
+      room: {
+        code: room.code,
+        hostId: room.hostId,
+        hostName: room.host.name,
+        hostImage: room.host.image,
+        connectedUsers: connectedUsers + 1, // +1 to include the host
+      },
+    });
   } catch (error) {
     console.error('Error joining room:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to join room' },
       { status: 500 }
     );
   }

@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { PrismaClient } from '@prisma/client';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+
+const prisma = new PrismaClient();
 
 function generateRoomCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -15,52 +17,49 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Use a transaction to ensure atomic operations
-    const room = await prisma.$transaction(async (tx) => {
-      // Create or update user
-      const user = await tx.user.upsert({
-        where: { id: session.user.id },
-        update: {
-          name: session.user.name || 'Unknown User',
-          email: session.user.email,
-          image: session.user.image,
-        },
-        create: {
-          id: session.user.id,
-          name: session.user.name || 'Unknown User',
-          email: session.user.email,
-          image: session.user.image,
-        },
-      });
+    // Create or update user
+    const user = await prisma.user.upsert({
+      where: { id: session.user.id },
+      update: {
+        name: session.user.name || 'Unknown User',
+        email: session.user.email,
+        image: session.user.image,
+      },
+      create: {
+        id: session.user.id,
+        name: session.user.name || 'Unknown User',
+        email: session.user.email,
+        image: session.user.image,
+      },
+    });
 
-      // Generate a unique room code
-      let roomCode = generateRoomCode();
-      let isUnique = false;
-      
-      while (!isUnique) {
-        const existingRoom = await tx.room.findUnique({
-          where: { code: roomCode },
-        });
-        if (!existingRoom) {
-          isUnique = true;
-        } else {
-          roomCode = generateRoomCode();
-        }
+    // Generate a unique room code
+    let roomCode = generateRoomCode();
+    let isUnique = false;
+    
+    while (!isUnique) {
+      const existingRoom = await prisma.room.findUnique({
+        where: { code: roomCode },
+      });
+      if (!existingRoom) {
+        isUnique = true;
+      } else {
+        roomCode = generateRoomCode();
       }
+    }
 
-      // Create new room with Spotify tokens from session
-      return await tx.room.create({
-        data: {
-          code: roomCode,
-          hostId: user.id,
-          hostAccessToken: session.user.accessToken!,
-          hostRefreshToken: session.user.refreshToken!,
-          active: true,
-        },
-        include: {
-          host: true,
-        },
-      });
+    // Create new room with Spotify tokens from session
+    const room = await prisma.room.create({
+      data: {
+        code: roomCode,
+        hostId: user.id,
+        hostAccessToken: session.user.accessToken!,
+        hostRefreshToken: session.user.refreshToken!,
+        active: true,
+      },
+      include: {
+        host: true,
+      },
     });
 
     return NextResponse.json({ room });
