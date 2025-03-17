@@ -11,25 +11,70 @@ type QueueItem = {
   addedAt: Date;
 };
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const hostId = searchParams.get('hostId');
+    const session = await getServerSession(authOptions);
 
-    if (!hostId) {
-      return NextResponse.json({ error: 'Host ID is required' }, { status: 400 });
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
-    // Find active room for the host
-    const room = await prisma.room.findFirst({
-      where: {
-        hostId,
-        active: true,
-      },
-      include: {
-        host: true,
-      },
+    // Find the user's active room
+    const room = await prisma.$transaction(async (tx) => {
+      const userRoom = await tx.room.findFirst({
+        where: {
+          hostId: session.user.id,
+          active: true,
+        },
+        include: {
+          queue: {
+            orderBy: {
+              addedAt: 'asc',
+            },
+          },
+          connectedUsers: true,
+        },
+      });
+
+      if (!userRoom) {
+        return null;
+      }
+
+      // Clean up inactive users
+      await tx.connectedUser.deleteMany({
+        where: {
+          roomId: userRoom.id,
+          lastSeen: {
+            lt: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
+          },
+        },
+      });
+
+      // Get updated connected users count
+      const connectedUsers = await tx.connectedUser.count({
+        where: {
+          roomId: userRoom.id,
+          lastSeen: {
+            gt: new Date(Date.now() - 5 * 60 * 1000), // Active in last 5 minutes
+          },
+        },
+      });
+
+      return {
+        ...userRoom,
+        connectedUsersCount: connectedUsers + 1, // +1 to include the host
+      };
     });
+
+    if (!room) {
+      return NextResponse.json(
+        { message: 'No active room found' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({ room });
   } catch (error) {
