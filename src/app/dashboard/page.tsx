@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Toaster, toast } from 'react-hot-toast';
 import Button from '@/components/ui/Button';
+import { Room } from '@prisma/client';
 
 interface Track {
   id: string;
@@ -65,6 +66,12 @@ export default function Dashboard() {
   const [isVisible, setIsVisible] = useState<boolean>(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const router = useRouter();
+  const [isCreating, setIsCreating] = useState(false);
+  const [isDestroying, setIsDestroying] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [activeRoom, setActiveRoom] = useState<Room | null>(null);
+  const [isJoining, setIsJoining] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Initialize roomId from localStorage after mount
   useEffect(() => {
@@ -732,6 +739,28 @@ export default function Dashboard() {
     }
   };
 
+  // Add this new function to check for active room
+  const checkActiveRoom = async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      const response = await fetch('/api/room/status');
+      if (response.ok) {
+        const data = await response.json();
+        setActiveRoom(data.room);
+      }
+    } catch (error) {
+      console.error('Error checking room status:', error);
+    }
+  };
+
+  // Add this to your useEffect that runs on mount
+  useEffect(() => {
+    if (status === 'authenticated') {
+      checkActiveRoom();
+    }
+  }, [status]);
+
   return (
     <div className="min-h-screen bg-[#121212] text-white">
       <Toaster
@@ -792,125 +821,126 @@ export default function Dashboard() {
             </div>
 
             {/* Mobile buttons */}
-            <div className="flex items-center gap-2 sm:hidden">
-              {guestRoomCode ? (
-                <button
-                  onClick={handleLeaveRoom}
-                  disabled={isLoading}
-                  className={`px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors ${
-                    isLoading ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {isLoading ? 'Leaving...' : 'Leave'}
-                </button>
-              ) : (
+            <div className="flex flex-col gap-2">
+              {!guestRoomCode ? (
                 <>
-                  <Button
-                    variant="primary"
-                    onClick={handleCreateRoom}
-                    disabled={isLoading}
-                    className="w-full"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center gap-2">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Creating Room...
-                      </div>
-                    ) : (
-                      'Create Room'
-                    )}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={handleDestroyRoom}
-                    disabled={isLoading}
-                    className="w-full"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center gap-2">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Destroying Room...
-                      </div>
-                    ) : (
-                      'Destroy Room'
-                    )}
-                  </Button>
+                  {!activeRoom ? (
+                    <Button
+                      variant="primary"
+                      onClick={handleCreateRoom}
+                      disabled={isCreating}
+                      className="w-full"
+                    >
+                      {isCreating ? (
+                        <div className="flex items-center gap-2">
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Creating...
+                        </div>
+                      ) : (
+                        'Create Room'
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      onClick={handleDestroyRoom}
+                      disabled={isDestroying}
+                      className="w-full"
+                    >
+                      {isDestroying ? (
+                        <div className="flex items-center gap-2">
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Destroying...
+                        </div>
+                      ) : (
+                        'Destroy Room'
+                      )}
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     onClick={() => signOut()}
-                    disabled={isLoading}
                     className="w-full"
                   >
-                    {isLoading ? (
-                      <div className="flex items-center gap-2">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Signing Out...
-                      </div>
-                    ) : (
-                      'Logout'
-                    )}
+                    Sign Out
                   </Button>
                 </>
+              ) : (
+                <Button
+                  variant="ghost"
+                  onClick={handleLeaveRoom}
+                  disabled={isLeaving}
+                  className="w-full"
+                >
+                  {isLeaving ? (
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Leaving...
+                    </div>
+                  ) : (
+                    'Leave'
+                  )}
+                </Button>
               )}
             </div>
 
             {/* Desktop buttons */}
-            <div className="hidden sm:flex items-center gap-4">
-              {guestRoomCode ? (
-                <button
-                  onClick={handleLeaveRoom}
-                  disabled={isLoading}
-                  className={`px-4 py-2 bg-red-600 text-white text-base rounded-lg hover:bg-red-700 transition-colors ${
-                    isLoading ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {isLoading ? 'Leaving...' : 'Leave Room'}
-                </button>
-              ) : (
+            <div className="flex items-center gap-4">
+              {!guestRoomCode ? (
                 <>
-                  <Button
-                    variant="primary"
-                    onClick={handleCreateRoom}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center gap-2">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Creating Room...
-                      </div>
-                    ) : (
-                      'Create Room'
-                    )}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={handleDestroyRoom}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center gap-2">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Destroying Room...
-                      </div>
-                    ) : (
-                      'Destroy Room'
-                    )}
-                  </Button>
+                  {!activeRoom ? (
+                    <Button
+                      variant="primary"
+                      onClick={handleCreateRoom}
+                      disabled={isCreating}
+                    >
+                      {isCreating ? (
+                        <div className="flex items-center gap-2">
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Creating...
+                        </div>
+                      ) : (
+                        'Create Room'
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      onClick={handleDestroyRoom}
+                      disabled={isDestroying}
+                    >
+                      {isDestroying ? (
+                        <div className="flex items-center gap-2">
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Destroying...
+                        </div>
+                      ) : (
+                        'Destroy Room'
+                      )}
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     onClick={() => signOut()}
-                    disabled={isLoading}
                   >
-                    {isLoading ? (
-                      <div className="flex items-center gap-2">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Signing Out...
-                      </div>
-                    ) : (
-                      'Logout'
-                    )}
+                    Sign Out
                   </Button>
                 </>
+              ) : (
+                <Button
+                  variant="ghost"
+                  onClick={handleLeaveRoom}
+                  disabled={isLeaving}
+                >
+                  {isLeaving ? (
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Leaving...
+                    </div>
+                  ) : (
+                    'Leave'
+                  )}
+                </Button>
               )}
             </div>
           </div>
