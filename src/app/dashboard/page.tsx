@@ -801,27 +801,29 @@ export default function Dashboard() {
                   {isLoading ? 'Leaving...' : 'Leave'}
                 </button>
               ) : (
-                <button
-                  onClick={roomId ? handleDestroyRoom : handleCreateRoom}
-                  disabled={isLoading}
-                  className={`px-3 py-2 text-white text-sm rounded-lg transition-colors ${
-                    roomId 
-                      ? 'bg-red-600 hover:bg-red-700' 
-                      : 'bg-[#1DB954] hover:bg-[#1ed760]'
-                  } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {isLoading ? '...' : (roomId ? 'Destroy' : 'Create')}
-                </button>
+                <>
+                  <button
+                    onClick={roomId ? handleDestroyRoom : handleCreateRoom}
+                    disabled={isLoading}
+                    className={`px-3 py-2 text-white text-sm rounded-lg transition-colors ${
+                      roomId 
+                        ? 'bg-red-600 hover:bg-red-700' 
+                        : 'bg-[#1DB954] hover:bg-[#1ed760]'
+                    } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isLoading ? '...' : (roomId ? 'Destroy' : 'Create')}
+                  </button>
+                  <button
+                    onClick={handleSignOut}
+                    disabled={isLoading}
+                    className={`px-3 py-2 bg-[#282828] text-white text-sm rounded-lg hover:bg-[#383838] transition-colors ${
+                      isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    Logout
+                  </button>
+                </>
               )}
-              <button
-                onClick={handleSignOut}
-                disabled={isLoading}
-                className={`px-3 py-2 bg-[#282828] text-white text-sm rounded-lg hover:bg-[#383838] transition-colors ${
-                  isLoading ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                Logout
-              </button>
             </div>
 
             {/* Desktop buttons */}
@@ -837,27 +839,29 @@ export default function Dashboard() {
                   {isLoading ? 'Leaving...' : 'Leave Room'}
                 </button>
               ) : (
-                <button
-                  onClick={roomId ? handleDestroyRoom : handleCreateRoom}
-                  disabled={isLoading}
-                  className={`px-4 py-2 text-white text-base rounded-lg transition-colors ${
-                    roomId 
-                      ? 'bg-red-600 hover:bg-red-700' 
-                      : 'bg-[#1DB954] hover:bg-[#1ed760]'
-                  } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {isLoading ? 'Processing...' : (roomId ? 'Destroy Room' : 'Create Room')}
-                </button>
+                <>
+                  <button
+                    onClick={roomId ? handleDestroyRoom : handleCreateRoom}
+                    disabled={isLoading}
+                    className={`px-4 py-2 text-white text-base rounded-lg transition-colors ${
+                      roomId 
+                        ? 'bg-red-600 hover:bg-red-700' 
+                        : 'bg-[#1DB954] hover:bg-[#1ed760]'
+                    } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isLoading ? 'Processing...' : (roomId ? 'Destroy Room' : 'Create Room')}
+                  </button>
+                  <button
+                    onClick={handleSignOut}
+                    disabled={isLoading}
+                    className={`px-4 py-2 bg-[#282828] text-white text-base rounded-lg hover:bg-[#383838] transition-colors ${
+                      isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    Logout
+                  </button>
+                </>
               )}
-              <button
-                onClick={handleSignOut}
-                disabled={isLoading}
-                className={`px-4 py-2 bg-[#282828] text-white text-base rounded-lg hover:bg-[#383838] transition-colors ${
-                  isLoading ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                Logout
-              </button>
             </div>
           </div>
         </div>
