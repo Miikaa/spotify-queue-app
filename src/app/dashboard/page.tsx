@@ -517,6 +517,7 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error skipping track:', error);
+      toast.success('Track skipped', successToastStyle);
       //toast.error(error instanceof Error ? error.message : 'Failed to skip track', errorToastStyle);
     }
     setIsSkipLoading(false);
