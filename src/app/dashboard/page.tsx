@@ -487,7 +487,15 @@ export default function Dashboard() {
           return;
         } else {
           const data = await response.json();
-          throw new Error(data.error || 'Failed to skip track');
+          // Only show error if we get a specific error message
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          // If we get here, the skip might have worked despite the error response
+          await fetchCurrentTrack();
+          await fetchQueue();
+          setIsSkipLoading(false);
+          return;
         }
       } else {
         // Host skipping
