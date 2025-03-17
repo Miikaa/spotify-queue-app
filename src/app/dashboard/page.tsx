@@ -799,27 +799,29 @@ export default function Dashboard() {
                   {isLoading ? 'Leaving...' : 'Leave'}
                 </button>
               ) : (
-                <button
-                  onClick={roomId ? handleDestroyRoom : handleCreateRoom}
-                  disabled={isLoading}
-                  className={`px-3 py-2 text-white text-sm rounded-lg transition-colors ${
-                    roomId 
-                      ? 'bg-red-600 hover:bg-red-700' 
-                      : 'bg-[#1DB954] hover:bg-[#1ed760]'
-                  } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {isLoading ? '...' : (roomId ? 'Destroy' : 'Create')}
-                </button>
+                <>
+                  <button
+                    onClick={roomId ? handleDestroyRoom : handleCreateRoom}
+                    disabled={isLoading}
+                    className={`px-3 py-2 text-white text-sm rounded-lg transition-colors ${
+                      roomId 
+                        ? 'bg-red-600 hover:bg-red-700' 
+                        : 'bg-[#1DB954] hover:bg-[#1ed760]'
+                    } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isLoading ? '...' : (roomId ? 'Destroy' : 'Create')}
+                  </button>
+                  <button
+                    onClick={handleSignOut}
+                    disabled={isLoading}
+                    className={`px-3 py-2 bg-[#282828] text-white text-sm rounded-lg hover:bg-[#383838] transition-colors ${
+                      isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    Logout
+                  </button>
+                </>
               )}
-              <button
-                onClick={handleSignOut}
-                disabled={isLoading}
-                className={`px-3 py-2 bg-[#282828] text-white text-sm rounded-lg hover:bg-[#383838] transition-colors ${
-                  isLoading ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                Logout
-              </button>
             </div>
 
             {/* Desktop buttons */}
@@ -835,27 +837,29 @@ export default function Dashboard() {
                   {isLoading ? 'Leaving...' : 'Leave Room'}
                 </button>
               ) : (
-                <button
-                  onClick={roomId ? handleDestroyRoom : handleCreateRoom}
-                  disabled={isLoading}
-                  className={`px-4 py-2 text-white text-base rounded-lg transition-colors ${
-                    roomId 
-                      ? 'bg-red-600 hover:bg-red-700' 
-                      : 'bg-[#1DB954] hover:bg-[#1ed760]'
-                  } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {isLoading ? 'Processing...' : (roomId ? 'Destroy Room' : 'Create Room')}
-                </button>
+                <>
+                  <button
+                    onClick={roomId ? handleDestroyRoom : handleCreateRoom}
+                    disabled={isLoading}
+                    className={`px-4 py-2 text-white text-base rounded-lg transition-colors ${
+                      roomId 
+                        ? 'bg-red-600 hover:bg-red-700' 
+                        : 'bg-[#1DB954] hover:bg-[#1ed760]'
+                    } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isLoading ? 'Processing...' : (roomId ? 'Destroy Room' : 'Create Room')}
+                  </button>
+                  <button
+                    onClick={handleSignOut}
+                    disabled={isLoading}
+                    className={`px-4 py-2 bg-[#282828] text-white text-base rounded-lg hover:bg-[#383838] transition-colors ${
+                      isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    Logout
+                  </button>
+                </>
               )}
-              <button
-                onClick={handleSignOut}
-                disabled={isLoading}
-                className={`px-4 py-2 bg-[#282828] text-white text-base rounded-lg hover:bg-[#383838] transition-colors ${
-                  isLoading ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                Logout
-              </button>
             </div>
           </div>
         </div>
@@ -887,15 +891,31 @@ export default function Dashboard() {
                       </p>
                       <p className="text-[#B3B3B3] text-sm sm:text-base">{currentTrack.album.name}</p>
                     </div>
-                    <button
-                      onClick={handleSkip}
-                      disabled={isSkipLoading}
-                      className={`px-4 py-2 bg-[#1DB954] text-white text-sm sm:text-base rounded-lg hover:bg-[#1ed760] transition-colors flex-shrink-0 ${
-                        isSkipLoading ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                    >
-                      {isSkipLoading ? 'Skipping...' : 'Skip'}
-                    </button>
+                    <div className="flex gap-2">
+                      {!guestRoomCode && (
+                        <button
+                          onClick={() => {
+                            fetchCurrentTrack();
+                            fetchQueue();
+                          }}
+                          className="p-2 text-white hover:text-[#1DB954] transition-colors"
+                          title="Refresh"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                            <path fillRule="evenodd" d="M4.755 10.059a7.5 7.5 0 0112.548-3.364l1.903 1.903h-3.183a.75.75 0 100 1.5h4.992a.75.75 0 00.75-.75V4.356a.75.75 0 00-1.5 0v3.18l-1.9-1.9A9 9 0 003.306 9.67a.75.75 0 101.45.388zm15.408 3.352a.75.75 0 00-.919.53 7.5 7.5 0 01-12.548 3.364l-1.902-1.903h3.183a.75.75 0 000-1.5H2.984a.75.75 0 00-.75.75v4.992a.75.75 0 001.5 0v-3.18l1.9 1.9a9 9 0 0015.059-4.035.75.75 0 00-.53-.918z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        onClick={handleSkip}
+                        disabled={isSkipLoading}
+                        className={`px-4 py-2 bg-[#1DB954] text-white text-sm sm:text-base rounded-lg hover:bg-[#1ed760] transition-colors flex-shrink-0 ${
+                          isSkipLoading ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      >
+                        {isSkipLoading ? 'Skipping...' : 'Skip'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
