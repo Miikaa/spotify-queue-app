@@ -1,37 +1,80 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("POSTGRES_PRISMA_URL")
-  directUrl = env("POSTGRES_URL_NON_POOLING")
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model User {
+  id            String   @id
+  name          String
+  email         String?
+  image         String?
+  accounts      Account[]
+  hostedRooms   Room[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Room {
-  id              String   @id @default(uuid())
-  code            String   @unique
-  hostId          String
-  hostName        String
-  hostImage       String?
-  hostAccessToken String
-  hostRefreshToken String
-  active          Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id              String          @id @default(cuid())
+  code            String          @unique // 6-digit room code
+  hostId          String          // Spotify user ID of the host
+  host            User            @relation(fields: [hostId], references: [id])
+  hostAccessToken String          // Host's Spotify access token
+  hostRefreshToken String         // Host's Spotify refresh token
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  active          Boolean         @default(true)
   queue           Queue[]
+  connectedUsers  ConnectedUser[]
 }
 
 model Queue {
-  id        String   @id @default(uuid())
+  id        String   @id @default(cuid())
   roomId    String
-  trackUri  String
-  trackName String
+  room      Room     @relation(fields: [roomId], references: [id])
+  trackUri  String   // Spotify track URI
+  trackName String   // Track name for display
+  addedBy   String   // Could be host ID or "guest"
   addedAt   DateTime @default(now())
-  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  played    Boolean  @default(false)
+}
 
-  @@index([roomId])
-} 
+model ConnectedUser {
+  id        String   @id @default(cuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id])
+  userId    String   // Guest ID or user ID
+  joinedAt  DateTime @default(now())
+  lastSeen  DateTime @default(now())
+
+  @@unique([roomId, userId])
+}

@@ -1,7 +1,17 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 const prisma = new PrismaClient();
+
+type QueueItem = {
+  id: string;
+  trackUri: string;
+  trackName: string;
+  addedBy: string;
+  addedAt: Date;
+};
 
 export async function GET(request: Request) {
   try {

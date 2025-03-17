@@ -1,49 +1,33 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { SpotifyApi, AccessToken } from '@spotify/web-api-ts-sdk';
+import { SpotifyApi } from '@spotify/web-api-ts-sdk';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import debounce from 'lodash.debounce';
 import { Track } from '@spotify/web-api-ts-sdk';
 import TrackSearch from './TrackSearch';
 import TrackList from './TrackList';
 
 interface QueueManagerProps {
+  roomId: string;
   isHost: boolean;
+  hostId: string;
   code: string;
 }
 
-interface ExtendedSession {
-  user: {
-    id: string;
-    name?: string | null;
-    email?: string | null;
-    image?: string | null;
-    accessToken: string;
-    refreshToken: string;
-  };
-}
-
-interface QueueResponse {
-  tracks: Track[];
-}
-
-export default function QueueManager({ isHost, code }: QueueManagerProps) {
-  const { data: session } = useSession() as { data: ExtendedSession | null };
+export default function QueueManager({ roomId, isHost, hostId, code }: QueueManagerProps) {
+  const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<'queue' | 'search'>('queue');
   const queryClient = useQueryClient();
 
   // Initialize Spotify API
   const spotifyApi = isHost && session?.user?.accessToken
-    ? SpotifyApi.withAccessToken(process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID!, {
-        access_token: session.user.accessToken,
-        token_type: 'Bearer',
-        expires_in: 3600
-      } as AccessToken)
+    ? SpotifyApi.withAccessToken(process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID!, session.user.accessToken)
     : null;
 
   // Fetch queue
-  const { data: queueData, isLoading: isLoadingQueue } = useQuery<QueueResponse>({
+  const { data: queueData, isLoading: isLoadingQueue } = useQuery({
     queryKey: ['queue', code],
     queryFn: async () => {
       if (!spotifyApi && !isHost) {
@@ -54,10 +38,9 @@ export default function QueueManager({ isHost, code }: QueueManagerProps) {
       }
       if (spotifyApi) {
         // For host, fetch from Spotify
-        const currentTrack = await spotifyApi.player.getPlaybackState();
-        return { tracks: currentTrack ? [currentTrack.item as Track] : [] };
+        return spotifyApi.player.getPlaybackQueue();
       }
-      return { tracks: [] };
+      return null;
     },
     refetchInterval: 5000,
   });
@@ -136,7 +119,7 @@ export default function QueueManager({ isHost, code }: QueueManagerProps) {
               )}
             </div>
             <TrackList
-              tracks={queueData?.tracks || []}
+              tracks={queueData?.queue || []}
               isLoading={isLoadingQueue}
             />
           </div>

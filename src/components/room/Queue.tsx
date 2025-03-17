@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
+import { SpotifyApi, AccessToken } from '@spotify/web-api-ts-sdk';
 import Image from 'next/image';
 
 interface QueueProps {
@@ -21,6 +23,7 @@ interface Track {
 }
 
 export default function Queue({ roomCode, isHost }: QueueProps) {
+  const { data: session } = useSession();
   const [queue, setQueue] = useState<Track[]>([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);

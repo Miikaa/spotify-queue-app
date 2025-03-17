@@ -29,6 +29,8 @@ export default function CurrentTrack({ roomCode, isHost }: CurrentTrackProps) {
   const [deviceId, setDeviceId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isHost || !session?.user?.accessToken) return;
+
     const fetchDevices = async (spotify: SpotifyApi) => {
       const devices = await spotify.player.getAvailableDevices();
       const activeDevice = devices.devices.find(device => device.is_active);
@@ -37,9 +39,7 @@ export default function CurrentTrack({ roomCode, isHost }: CurrentTrackProps) {
       }
     };
 
-    const fetchHostPlayback = async () => {
-      if (!session?.user?.accessToken) return;
-      
+    const fetchCurrentTrack = async () => {
       try {
         const accessToken: AccessToken = {
           access_token: session.user.accessToken,
@@ -65,34 +65,11 @@ export default function CurrentTrack({ roomCode, isHost }: CurrentTrackProps) {
       }
     };
 
-    const fetchGuestPlayback = async () => {
-      try {
-        const response = await fetch(`/api/room/${roomCode}/playback`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to fetch playback');
-        }
-
-        if (data.currentTrack) {
-          setCurrentTrack(data.currentTrack);
-          setIsPlaying(data.is_playing);
-        } else {
-          setCurrentTrack(null);
-          setIsPlaying(false);
-        }
-      } catch (err) {
-        console.error('Error fetching playback:', err);
-        setError('Failed to fetch playback');
-      }
-    };
-
-    const fetchPlayback = isHost ? fetchHostPlayback : fetchGuestPlayback;
-    fetchPlayback();
-    const interval = setInterval(fetchPlayback, 5000);
+    fetchCurrentTrack();
+    const interval = setInterval(fetchCurrentTrack, 5000);
 
     return () => clearInterval(interval);
-  }, [isHost, session, roomCode]);
+  }, [isHost, session]);
 
   const handlePlayPause = async () => {
     if (!session?.user?.accessToken) return;

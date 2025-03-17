@@ -1,40 +1,17 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { AccessToken } from '@spotify/web-api-ts-sdk';
+import { SpotifyApi, AccessToken } from '@spotify/web-api-ts-sdk';
 
 const prisma = new PrismaClient();
 
-interface SpotifyTrack {
-  id: string;
-  name: string;
-  uri: string;
-  duration_ms: number;
-  artists: {
-    name: string;
-  }[];
-  album: {
-    name: string;
-    images: {
-      url: string;
-      width: number;
-      height: number;
-    }[];
-  };
-}
-
-interface QueueItem {
-  id: string;
-  roomId: string;
-  trackUri: string;
-  trackName: string;
-  addedBy: string;
-  addedAt: Date;
-  played: boolean;
+interface SpotifyError {
+  status?: number;
+  message?: string;
 }
 
 interface PlaybackResponse {
-  currentTrack: SpotifyTrack | null;
-  queue: QueueItem[];
+  currentTrack: any;
+  queue: any[];
   progress_ms: number;
   is_playing: boolean;
   status: 'ok' | 'no_playback' | 'no_device' | 'host_session_expired' | 'no_premium' | 'error';
@@ -76,10 +53,10 @@ async function refreshAccessToken(refreshToken: string): Promise<AccessToken | n
 
 export async function GET(
   request: Request,
-  context: { params: { code: string } }
+  { params }: { params: { code: string } }
 ) {
   try {
-    const { code } = context.params;
+    const { code } = params;
 
     // Find the room and check if it's active
     const room = await prisma.room.findUnique({

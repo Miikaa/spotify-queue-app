@@ -1,7 +1,6 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 
 export default function AuthError() {
   const searchParams = useSearchParams();
@@ -20,12 +19,12 @@ export default function AuthError() {
                 ? 'There was an error connecting to Spotify. Please try again.'
                 : error || 'An unknown error occurred'}
             </p>
-            <Link
+            <a
               href="/"
               className="mt-4 inline-block text-blue-500 hover:text-blue-400"
             >
               Return to Home
-            </Link>
+            </a>
           </div>
         </div>
       </div>

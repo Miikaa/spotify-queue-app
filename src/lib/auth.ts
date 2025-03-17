@@ -1,6 +1,9 @@
-import { type Session } from 'next-auth';
-import { type JWT } from 'next-auth/jwt';
+import { NextAuthOptions, User } from 'next-auth';
+import { JWT } from 'next-auth/jwt';
 import SpotifyProvider from 'next-auth/providers/spotify';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 if (!process.env.NEXTAUTH_SECRET) {
   throw new Error('Please provide NEXTAUTH_SECRET environment variable');
@@ -19,48 +22,18 @@ const scopes = [
   'playlist-modify-private',
 ].join(' ');
 
-type SpotifyProfile = {
+interface ExtendedToken extends JWT {
   id: string;
   name?: string | null;
   email?: string | null;
   image?: string | null;
-};
-
-type SpotifyAccount = {
-  access_token?: string;
-  refresh_token?: string;
-  expires_at?: number;
-};
-
-// Extend the built-in types
-declare module 'next-auth' {
-  interface Session {
-    error?: string;
-    user: {
-      id: string;
-      name?: string | null;
-      email?: string | null;
-      image?: string | null;
-      accessToken: string;
-      refreshToken: string;
-    }
-  }
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpires: number;
+  error?: string;
 }
 
-declare module 'next-auth/jwt' {
-  interface JWT {
-    id: string;
-    name?: string | null;
-    email?: string | null;
-    image?: string | null;
-    accessToken: string;
-    refreshToken: string;
-    accessTokenExpires: number;
-    error?: string;
-  }
-}
-
-export const authOptions = {
+export const authOptions: NextAuthOptions = {
   providers: [
     SpotifyProvider({
       clientId: process.env.SPOTIFY_CLIENT_ID ?? '',
@@ -73,7 +46,7 @@ export const authOptions = {
   ],
   secret: process.env.NEXTAUTH_SECRET,
   session: {
-    strategy: 'jwt' as const,
+    strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   pages: {
@@ -81,25 +54,11 @@ export const authOptions = {
     error: '/',
   },
   callbacks: {
-    async signIn({ 
-      user,
-      account
-    }: { 
-      user: SpotifyProfile;
-      account: SpotifyAccount | null;
-    }) {
+    async signIn({ user, account }) {
       if (!account || !user) return false;
       return true;
     },
-    async jwt({ 
-      token,
-      account,
-      user 
-    }: { 
-      token: JWT;
-      account: SpotifyAccount | null;
-      user: SpotifyProfile | null;
-    }) {
+    async jwt({ token, account, user }): Promise<ExtendedToken> {
       // Initial sign in
       if (account && user) {
         return {
@@ -115,8 +74,9 @@ export const authOptions = {
       }
 
       // Return previous token if the access token has not expired
-      if (token.accessTokenExpires && Date.now() < token.accessTokenExpires) {
-        return token;
+      const tokenWithExp = token as ExtendedToken;
+      if (tokenWithExp.accessTokenExpires && Date.now() < tokenWithExp.accessTokenExpires) {
+        return tokenWithExp;
       }
 
       // Access token has expired, refresh it
@@ -129,7 +89,7 @@ export const authOptions = {
           },
           body: new URLSearchParams({
             grant_type: 'refresh_token',
-            refresh_token: token.refreshToken,
+            refresh_token: (token as ExtendedToken).refreshToken,
           }),
         });
 
@@ -141,43 +101,29 @@ export const authOptions = {
           ...token,
           accessToken: tokens.access_token,
           accessTokenExpires: Date.now() + tokens.expires_in * 1000,
-        };
+        } as ExtendedToken;
       } catch (error) {
         console.error('Error refreshing access token', error);
         return {
           ...token,
           error: 'RefreshAccessTokenError',
-        };
+        } as ExtendedToken;
       }
     },
-    async session({ 
-      session,
-      token 
-    }: { 
-      session: Session;
-      token: JWT & {
-        id: string;
-        accessToken: string;
-        refreshToken: string;
-        error?: string;
-      };
-    }) {
-      session.user.id = token.id;
-      session.user.name = token.name;
-      session.user.email = token.email;
-      session.user.image = token.image;
-      session.user.accessToken = token.accessToken;
-      session.user.refreshToken = token.refreshToken;
-      session.error = token.error;
+    async session({ session, token }) {
+      if (session.user && token) {
+        const extendedToken = token as ExtendedToken;
+        session.user.id = extendedToken.id;
+        session.user.name = extendedToken.name;
+        session.user.email = extendedToken.email;
+        session.user.image = extendedToken.image;
+        session.user.accessToken = extendedToken.accessToken;
+        session.user.refreshToken = extendedToken.refreshToken;
+        (session as any).error = extendedToken.error;
+      }
       return session;
     },
-    async redirect({ 
-      url,
-      baseUrl 
-    }: { 
-      url: string;
-      baseUrl: string;
-    }) {
+    async redirect({ url, baseUrl }) {
       // After successful sign in, redirect to dashboard
       if (url.startsWith('/api/auth/callback')) {
         return `${baseUrl}/dashboard`;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -25,7 +25,7 @@ export default function TrackSearch({ roomCode }: TrackSearchProps) {
   const [error, setError] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  const handleSearch = useCallback(async (query: string) => {
+  const handleSearch = async (query: string) => {
     if (!query.trim()) {
       setSearchResults([]);
       return;
@@ -49,7 +49,7 @@ export default function TrackSearch({ roomCode }: TrackSearchProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [roomCode]);
+  };
 
   const handleAddToQueue = async (track: Track) => {
     try {
@@ -77,7 +77,7 @@ export default function TrackSearch({ roomCode }: TrackSearchProps) {
 
   useEffect(() => {
     handleSearch(debouncedSearchTerm);
-  }, [debouncedSearchTerm, handleSearch]);
+  }, [debouncedSearchTerm]);
 
   return (
     <div className="space-y-4">

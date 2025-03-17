@@ -1,12 +1,11 @@
 'use client';
 
 import { useSession, signOut } from 'next-auth/react';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { redirect, useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Toaster, toast } from 'react-hot-toast';
-import { Session } from 'next-auth';
 
 interface Track {
   id: string;
@@ -25,6 +24,19 @@ interface PlaybackState {
   is_playing: boolean;
 }
 
+// Add session user interface
+interface SessionUser {
+  name?: string;
+  email?: string;
+  image?: string;
+  accessToken?: string;
+}
+
+interface Session {
+  user?: SessionUser;
+  expires: string;
+}
+
 interface HostInfo {
   code: string;
   hostId: string;
@@ -34,10 +46,7 @@ interface HostInfo {
 }
 
 export default function Dashboard() {
-  const { data: session, status } = useSession() as {
-    data: Session | null;
-    status: "loading" | "authenticated" | "unauthenticated";
-  };
+  const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   const guestRoomCode = searchParams.get('guest');
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
@@ -56,8 +65,79 @@ export default function Dashboard() {
   const [isInitialized, setIsInitialized] = useState(false);
   const router = useRouter();
 
-  // Memoize fetch functions to avoid dependency issues
-  const fetchCurrentTrack = useCallback(async () => {
+  // Initialize roomId from localStorage after mount
+  useEffect(() => {
+    const storedRoomId = localStorage.getItem('roomId');
+    if (storedRoomId) {
+      setRoomId(storedRoomId);
+    }
+  }, []);
+
+  // Redirect if not authenticated and not a guest
+  if (status === 'unauthenticated' && !guestRoomCode) {
+    redirect('/');
+  }
+
+  // Initialize session and fetch initial data
+  useEffect(() => {
+    const initializeSession = async () => {
+      if (status !== 'authenticated' || !session?.user?.accessToken) return;
+
+      try {
+        // Fetch initial data
+        await Promise.all([
+          fetchCurrentTrack(),
+          fetchQueue()
+        ]);
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('Error initializing session:', error);
+      }
+    };
+
+    initializeSession();
+  }, [status, session]);
+
+  // Effect to fetch host info if in guest mode
+  useEffect(() => {
+    const fetchHostInfo = async () => {
+      if (!guestRoomCode) return;
+      
+      try {
+        const response = await fetch('/api/room/join', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ roomCode: guestRoomCode }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setHostInfo(data.room);
+          setRoomId(data.room.code);
+        } else {
+          // If room doesn't exist, redirect to home
+          redirect('/');
+        }
+      } catch (error) {
+        console.error('Error fetching host info:', error);
+        redirect('/');
+      }
+    };
+
+    fetchHostInfo();
+  }, [guestRoomCode]);
+
+  // Format milliseconds to mm:ss
+  const formatTime = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const fetchCurrentTrack = async () => {
     if (!session?.user?.accessToken) return;
     
     try {
@@ -104,9 +184,9 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error fetching current track:', error);
     }
-  }, [session?.user?.accessToken]);
+  };
 
-  const fetchQueue = useCallback(async () => {
+  const fetchQueue = async () => {
     if (!session?.user?.accessToken) return;
     
     try {
@@ -123,114 +203,6 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error fetching queue:', error);
     }
-  }, [session?.user?.accessToken]);
-
-  // Initialize roomId from localStorage after mount
-  useEffect(() => {
-    const storedRoomId = localStorage.getItem('roomId');
-    if (storedRoomId) {
-      setRoomId(storedRoomId);
-    }
-  }, []);
-
-  // Redirect if not authenticated and not a guest
-  if (status === 'unauthenticated' && !guestRoomCode) {
-    redirect('/');
-  }
-
-  // Initialize session and fetch initial data
-  useEffect(() => {
-    let mounted = true;
-
-    const initializeSession = async () => {
-      // For guests, we rely on the host info effect
-      if (guestRoomCode) return;
-
-      // For hosts, we need to wait for authentication
-      if (status !== 'authenticated' || !session?.user?.accessToken) return;
-
-      try {
-        setIsLoading(true);
-        // Add a small delay to ensure Spotify's API is ready
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        if (!mounted) return;
-
-        // Fetch initial data
-        await Promise.all([
-          fetchCurrentTrack(),
-          fetchQueue()
-        ]);
-
-        if (!mounted) return;
-        setIsInitialized(true);
-      } catch (error) {
-        console.error('Error initializing session:', error);
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    initializeSession();
-
-    return () => {
-      mounted = false;
-    };
-  }, [status, session, guestRoomCode, fetchCurrentTrack, fetchQueue]);
-
-  // Effect to fetch host info if in guest mode
-  useEffect(() => {
-    let mounted = true;
-
-    const fetchHostInfo = async () => {
-      if (!guestRoomCode) return;
-      
-      try {
-        setIsLoading(true);
-        const response = await fetch('/api/room/join', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ roomCode: guestRoomCode }),
-        });
-
-        if (!mounted) return;
-
-        if (response.ok) {
-          const data = await response.json();
-          setHostInfo(data.room);
-          setRoomId(data.room.code);
-          setIsInitialized(true);
-        } else {
-          // If room doesn't exist, redirect to home
-          redirect('/');
-        }
-      } catch (error) {
-        console.error('Error fetching host info:', error);
-        redirect('/');
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    fetchHostInfo();
-
-    return () => {
-      mounted = false;
-    };
-  }, [guestRoomCode]);
-
-  // Format milliseconds to mm:ss
-  const formatTime = (ms: number) => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   // Handle visibility change
@@ -258,6 +230,31 @@ export default function Dashboard() {
       localStorage.removeItem('roomId');
     }
   }, [roomId]);
+
+  // Effect for fetching current track and queue
+  useEffect(() => {
+    if (!isInitialized) return; // Don't start polling until initialized
+
+    let intervalId: NodeJS.Timeout;
+
+    const updateData = async () => {
+      if (!isVisible || !session?.user?.accessToken) return;
+      await Promise.all([
+        fetchCurrentTrack(),
+        fetchQueue()
+      ]);
+    };
+
+    // Set up interval for updates
+    intervalId = setInterval(updateData, 5000);
+
+    return () => {
+      clearInterval(intervalId);
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+      }
+    };
+  }, [session, isVisible, isInitialized]);
 
   // Effect for search
   useEffect(() => {
@@ -523,100 +520,6 @@ export default function Dashboard() {
     setIsSkipLoading(false);
   };
 
-  // Effect for fetching current track and queue
-  useEffect(() => {
-    if (!isInitialized) return; // Don't start polling until initialized
-
-    const updateData = async () => {
-      if (!isVisible) return;
-
-      if (guestRoomCode) {
-        // Guest polling
-        try {
-          const response = await fetch(`/api/room/${guestRoomCode}/playback`);
-          if (response.ok) {
-            const data = await response.json();
-            
-            // Handle different status cases
-            if (data.status === 'no_playback' || data.status === 'no_device' || 
-                data.status === 'host_session_expired' || data.status === 'error') {
-              setCurrentTrack(null);
-              setQueue([]);
-              setPlaybackProgress(0);
-              setIsPlaying(false);
-              if (progressInterval.current) {
-                clearInterval(progressInterval.current);
-              }
-              
-              // Show appropriate toast message
-              toast(data.message, {
-                icon: '⚠️',
-                style: {
-                  background: '#282828',
-                  color: '#fff',
-                  borderRadius: '8px',
-                },
-              });
-              return;
-            }
-
-            // Handle successful playback state
-            setCurrentTrack(data.currentTrack);
-            setQueue(data.queue);
-            setPlaybackProgress(data.progress_ms);
-            setIsPlaying(data.is_playing);
-
-            // Update progress bar for guests
-            if (data.is_playing && data.currentTrack) {
-              if (progressInterval.current) {
-                clearInterval(progressInterval.current);
-              }
-              progressInterval.current = setInterval(() => {
-                setPlaybackProgress(prev => {
-                  if (prev >= data.currentTrack.duration_ms) {
-                    if (progressInterval.current) {
-                      clearInterval(progressInterval.current);
-                    }
-                    return 0;
-                  }
-                  return prev + 1000;
-                });
-              }, 1000);
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching guest data:', error);
-          toast('Failed to connect to the room. Please try again.', {
-            icon: '❌',
-            style: {
-              background: '#ff4444',
-              color: '#fff',
-              borderRadius: '8px',
-            },
-          });
-        }
-      } else if (session?.user?.accessToken) {
-        // Host polling
-        await Promise.all([
-          fetchCurrentTrack(),
-          fetchQueue()
-        ]);
-      }
-    };
-
-    // Set up interval for updates
-    const intervalId = setInterval(updateData, 5000);
-    // Initial update
-    updateData();
-
-    return () => {
-      clearInterval(intervalId);
-      if (progressInterval.current) {
-        clearInterval(progressInterval.current);
-      }
-    };
-  }, [session, isVisible, isInitialized, fetchCurrentTrack, fetchQueue, guestRoomCode]);
-
   // Effect for fetching room info - now considers visibility
   useEffect(() => {
     const fetchRoomId = async () => {
@@ -683,6 +586,119 @@ export default function Dashboard() {
 
     return () => clearInterval(intervalId);
   }, [roomId]);
+
+  // Effect for fetching current track and queue for guests
+  useEffect(() => {
+    if (!guestRoomCode || !hostInfo) return;
+
+    const fetchGuestData = async () => {
+      try {
+        const response = await fetch(`/api/room/${guestRoomCode}/playback`);
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Handle different status cases
+          if (data.status === 'no_playback' || data.status === 'no_device' || 
+              data.status === 'host_session_expired' || data.status === 'error') {
+            setCurrentTrack(null);
+            setQueue([]);
+            setPlaybackProgress(0);
+            setIsPlaying(false);
+            if (progressInterval.current) {
+              clearInterval(progressInterval.current);
+            }
+            
+            // Show appropriate toast message
+            toast(data.message, {
+              icon: '⚠️',
+              style: {
+                background: '#282828',
+                color: '#fff',
+                borderRadius: '8px',
+              },
+            });
+            return;
+          }
+
+          // Handle successful playback state
+          setCurrentTrack(data.currentTrack);
+          setQueue(data.queue);
+          setPlaybackProgress(data.progress_ms);
+          setIsPlaying(data.is_playing);
+
+          // Update progress bar for guests
+          if (data.is_playing && data.currentTrack) {
+            if (progressInterval.current) {
+              clearInterval(progressInterval.current);
+            }
+            progressInterval.current = setInterval(() => {
+              setPlaybackProgress(prev => {
+                if (prev >= data.currentTrack.duration_ms) {
+                  if (progressInterval.current) {
+                    clearInterval(progressInterval.current);
+                  }
+                  return 0;
+                }
+                return prev + 1000;
+              });
+            }, 1000);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching guest data:', error);
+        toast('Failed to connect to the room. Please try again.', {
+          icon: '❌',
+          style: {
+            background: '#ff4444',
+            color: '#fff',
+            borderRadius: '8px',
+          },
+        });
+      }
+    };
+
+    fetchGuestData();
+    const intervalId = setInterval(fetchGuestData, 5000);
+
+    return () => {
+      clearInterval(intervalId);
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+      }
+    };
+  }, [guestRoomCode, hostInfo]);
+
+  // Effect for session changes
+  useEffect(() => {
+    const syncTokens = async () => {
+      if (!session?.user?.accessToken || !roomId) return;
+
+      try {
+        // Update room with latest tokens
+        const response = await fetch(`/api/room/${roomId}/sync-tokens`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          if (response.status === 404) {
+            // Room not found or user is not host - clear roomId
+            setRoomId(null);
+            localStorage.removeItem('roomId');
+          } else {
+            console.error('Failed to sync tokens:', data.error);
+          }
+        }
+      } catch (error) {
+        console.error('Error syncing tokens:', error);
+      }
+    };
+
+    syncTokens();
+  }, [session?.user?.accessToken, roomId]);
 
   const handleLeaveRoom = async () => {
     if (isLoading) return;
@@ -783,31 +799,27 @@ export default function Dashboard() {
                   {isLoading ? 'Leaving...' : 'Leave'}
                 </button>
               ) : (
-                <>
-                  <button
-                    onClick={roomId ? handleDestroyRoom : handleCreateRoom}
-                    disabled={isLoading}
-                    className={`px-3 py-2 text-white text-sm rounded-lg transition-colors ${
-                      roomId 
-                        ? 'bg-red-600 hover:bg-red-700' 
-                        : 'bg-[#1DB954] hover:bg-[#1ed760]'
-                    } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    {isLoading ? '...' : (roomId ? 'Destroy' : 'Create')}
-                  </button>
-                  {!guestRoomCode && (
-                    <button
-                      onClick={handleSignOut}
-                      disabled={isLoading}
-                      className={`px-3 py-2 bg-[#282828] text-white text-sm rounded-lg hover:bg-[#383838] transition-colors ${
-                        isLoading ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                    >
-                      Logout
-                    </button>
-                  )}
-                </>
+                <button
+                  onClick={roomId ? handleDestroyRoom : handleCreateRoom}
+                  disabled={isLoading}
+                  className={`px-3 py-2 text-white text-sm rounded-lg transition-colors ${
+                    roomId 
+                      ? 'bg-red-600 hover:bg-red-700' 
+                      : 'bg-[#1DB954] hover:bg-[#1ed760]'
+                  } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isLoading ? '...' : (roomId ? 'Destroy' : 'Create')}
+                </button>
               )}
+              <button
+                onClick={handleSignOut}
+                disabled={isLoading}
+                className={`px-3 py-2 bg-[#282828] text-white text-sm rounded-lg hover:bg-[#383838] transition-colors ${
+                  isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                Logout
+              </button>
             </div>
 
             {/* Desktop buttons */}
@@ -823,31 +835,27 @@ export default function Dashboard() {
                   {isLoading ? 'Leaving...' : 'Leave Room'}
                 </button>
               ) : (
-                <>
-                  <button
-                    onClick={roomId ? handleDestroyRoom : handleCreateRoom}
-                    disabled={isLoading}
-                    className={`px-4 py-2 text-white text-base rounded-lg transition-colors ${
-                      roomId 
-                        ? 'bg-red-600 hover:bg-red-700' 
-                        : 'bg-[#1DB954] hover:bg-[#1ed760]'
-                    } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    {isLoading ? 'Processing...' : (roomId ? 'Destroy Room' : 'Create Room')}
-                  </button>
-                  {!guestRoomCode && (
-                    <button
-                      onClick={handleSignOut}
-                      disabled={isLoading}
-                      className={`px-4 py-2 bg-[#282828] text-white text-base rounded-lg hover:bg-[#383838] transition-colors ${
-                        isLoading ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                    >
-                      Logout
-                    </button>
-                  )}
-                </>
+                <button
+                  onClick={roomId ? handleDestroyRoom : handleCreateRoom}
+                  disabled={isLoading}
+                  className={`px-4 py-2 text-white text-base rounded-lg transition-colors ${
+                    roomId 
+                      ? 'bg-red-600 hover:bg-red-700' 
+                      : 'bg-[#1DB954] hover:bg-[#1ed760]'
+                  } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isLoading ? 'Processing...' : (roomId ? 'Destroy Room' : 'Create Room')}
+                </button>
               )}
+              <button
+                onClick={handleSignOut}
+                disabled={isLoading}
+                className={`px-4 py-2 bg-[#282828] text-white text-base rounded-lg hover:bg-[#383838] transition-colors ${
+                  isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>
@@ -872,9 +880,7 @@ export default function Dashboard() {
                 <div className="flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h2 className="text-xl sm:text-2xl font-bold mb-2">
-                        Now Playing {isPlaying ? '' : '(Paused)'}
-                      </h2>
+                      <h2 className="text-xl sm:text-2xl font-bold mb-2">Now Playing</h2>
                       <h3 className="text-lg sm:text-xl font-semibold">{currentTrack.name}</h3>
                       <p className="text-[#B3B3B3] text-sm sm:text-base">
                         {currentTrack.artists.map(artist => artist.name).join(', ')}

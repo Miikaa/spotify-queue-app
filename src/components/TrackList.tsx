@@ -1,7 +1,6 @@
 'use client';
 
 import { Track } from '@spotify/web-api-ts-sdk';
-import Image from 'next/image';
 
 interface TrackListProps {
   tracks: Track[];
@@ -39,15 +38,11 @@ export default function TrackList({ tracks, isLoading }: TrackListProps) {
           className="flex items-center gap-3 p-2 bg-gray-700/50 rounded-lg"
         >
           {track.album.images[0] && (
-            <div className="relative w-12 h-12 flex-shrink-0">
-              <Image
-                src={track.album.images[0].url}
-                alt={track.album.name}
-                fill
-                className="rounded object-cover"
-                sizes="48px"
-              />
-            </div>
+            <img
+              src={track.album.images[0].url}
+              alt={track.album.name}
+              className="w-12 h-12 rounded"
+            />
           )}
           <div className="flex-1 min-w-0">
             <p className="text-white font-medium truncate">{track.name}</p>

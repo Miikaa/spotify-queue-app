@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { SpotifyApi, Track } from '@spotify/web-api-ts-sdk';
 import { useQuery } from '@tanstack/react-query';
 import debounce from 'lodash.debounce';
-import Image from 'next/image';
 
 interface TrackSearchProps {
   onTrackSelect: (track: Track) => void;
@@ -15,21 +14,19 @@ interface TrackSearchProps {
 export default function TrackSearch({ onTrackSelect, spotifyApi, roomCode }: TrackSearchProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleSearch = useCallback(async (query: string) => {
-    if (!query.trim()) return null;
-    if (spotifyApi) {
-      return spotifyApi.search(query, ['track'], undefined, 20);
-    } else {
-      // Guest search through our API
-      const response = await fetch(`/api/room/${roomCode}/search?q=${encodeURIComponent(query)}`);
-      if (!response.ok) throw new Error('Failed to search tracks');
-      return response.json();
-    }
-  }, [spotifyApi, roomCode]);
-
-  const debouncedSearch = useMemo(
-    () => debounce(handleSearch, 300),
-    [handleSearch]
+  const debouncedSearch = useCallback(
+    debounce(async (query: string) => {
+      if (!query.trim()) return null;
+      if (spotifyApi) {
+        return spotifyApi.search(query, ['track'], undefined, 20);
+      } else {
+        // Guest search through our API
+        const response = await fetch(`/api/room/${roomCode}/search?q=${encodeURIComponent(query)}`);
+        if (!response.ok) throw new Error('Failed to search tracks');
+        return response.json();
+      }
+    }, 300),
+    [spotifyApi, roomCode]
   );
 
   const { data: searchResults, isLoading } = useQuery({
@@ -64,16 +61,11 @@ export default function TrackSearch({ onTrackSelect, spotifyApi, roomCode }: Tra
               onClick={() => onTrackSelect(track)}
             >
               {track.album.images[0] && (
-                <div className="relative w-12 h-12">
-                  <Image
-                    src={track.album.images[0].url}
-                    alt={track.album.name}
-                    className="rounded"
-                    fill
-                    sizes="48px"
-                    style={{ objectFit: 'cover' }}
-                  />
-                </div>
+                <img
+                  src={track.album.images[0].url}
+                  alt={track.album.name}
+                  className="w-12 h-12 rounded"
+                />
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-white font-medium truncate">{track.name}</p>

@@ -6,20 +6,16 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'i.scdn.co'
+        hostname: 'i.scdn.co',
       },
       {
         protocol: 'https',
-        hostname: 'platform-lookaside.fbsbx.com'
+        hostname: '*.fbcdn.net',
       },
       {
         protocol: 'https',
-        hostname: 'mosaic.scdn.co'
+        hostname: '*.googleusercontent.com',
       },
-      {
-        protocol: 'https',
-        hostname: '**.fbcdn.net'
-      }
     ],
   }
 }

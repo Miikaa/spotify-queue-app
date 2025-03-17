@@ -7,15 +7,11 @@ import { redirect } from 'next/navigation';
 
 const prisma = new PrismaClient();
 
-export async function createRoom() {
+export async function createRoom(formData: FormData) {
   const session = await getServerSession(authOptions);
   
   if (!session?.user?.id) {
     throw new Error('Must be logged in to create a room');
-  }
-
-  if (!session.user.accessToken || !session.user.refreshToken) {
-    throw new Error('Missing Spotify tokens');
   }
 
   try {
@@ -38,8 +34,6 @@ export async function createRoom() {
       data: {
         code: roomCode!,
         hostId: session.user.id,
-        hostAccessToken: session.user.accessToken,
-        hostRefreshToken: session.user.refreshToken,
       },
     });
 
