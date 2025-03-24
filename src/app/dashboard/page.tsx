@@ -775,7 +775,7 @@ export default function Dashboard() {
               <div className="flex flex-col min-w-0">
                 <span className="font-medium truncate">
                   {guestRoomCode 
-                    ? `${hostInfo?.hostName}'s Room`
+                    ? `${hostInfo?.hostName}'s Room, moro`
                     : session?.user?.name || 'Anonymous User'
                   }
                 </span>
